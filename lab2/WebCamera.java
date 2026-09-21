@@ -49,7 +49,12 @@ public class WebCamera {
         this.fps = fps;
     }
 
-    public int countCharacteristics(WebCamera cam) {
-        return cam.width * cam.fps;
+    public int countCharacteristics() {
+        return this.width * this.fps;
     }
+
+    public double calculateMegapixels() {
+        int height = (this.width * 9) / 16;
+        return (this.width * height) / 1_000_000.0;
+}
 }
