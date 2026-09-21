@@ -25,20 +25,6 @@ public class WebCamera {
         }
     }
 
-    public static WebCamera getBestCamera(WebCamera[] cams) {
-        WebCamera bestCam = cams[0];
-        int bestScore = bestCam.width * bestCam.fps;
-        for (int i = 1; i < cams.length; i++) {
-            int score = cams[i].width * cams[i].fps;
-            if (score > bestScore) {
-                bestScore = score;
-                bestCam = cams[i];
-            }
-        }
-        
-        return bestCam;
-    }
-
     public String getModel() {
         return model;
     }
@@ -49,5 +35,21 @@ public class WebCamera {
 
     public int getFPS() {
         return fps;
+    }
+
+    public void setModel(String model) {
+        this.model = model;
+    }
+
+    public void setWidth(int width) {
+        this.width = width;
+    }
+
+    public void setFPS(int fps) {
+        this.fps = fps;
+    }
+
+    public int countCharacteristics(WebCamera cam) {
+        return cam.width * cam.fps;
     }
 }
