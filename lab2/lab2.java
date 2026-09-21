@@ -4,6 +4,6 @@ public class lab2 {
 
     public static void main(String[] args) {
         WebCamera defaultCamera = new WebCamera();
-        System.out.println(defaultCamera);
+        WebCamera cam = new WebCamera("Logitech C270 / C310", 640, 60);
     }
 }
