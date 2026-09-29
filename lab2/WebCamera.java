@@ -2,19 +2,19 @@ package lab2;
 
 public class WebCamera {
     private String model;
-    private int width;
-    private int fps;
+    private double width;
+    private double fps;
 
     public WebCamera() {
         this.model = "Стандартная камера";
-        this.width = 1280;
-        this.fps = 30;
+        this.width = 1280.0;
+        this.fps = 30.0;
     }
 
-    public WebCamera(String model, int width, int fps) {
+    public WebCamera(String model, double width, double fps) {
         this.model = model;
         if (width < 320 || width > 3840) {
-            System.out.println("Минимальное значение для ширины экрана 320, а максимальное - 3840");
+            System.out.println("Минимальное значение для ширины экрана 320 пикселей, а максимальное - 3840 пикселей");
         } else {
             this.width = width;
         }
@@ -29,11 +29,11 @@ public class WebCamera {
         return model;
     }
 
-    public int getWigth() {
+    public double getWigth() {
         return width;
     }
 
-    public int getFPS() {
+    public double getFPS() {
         return fps;
     }
 
@@ -41,20 +41,30 @@ public class WebCamera {
         this.model = model;
     }
 
-    public void setWidth(int width) {
+   public boolean setWidth(double width) {
+        if (width < 320.0 || width > 3840.0) {
+            System.out.println("Ошибка: ширина экрана должна быть в диапазоне от 320 до 3840 пикселей!");
+            return false;
+        }
         this.width = width;
+        return true;
     }
 
-    public void setFPS(int fps) {
+    public boolean setFPS(double fps) {
+        if (fps < 1.0 || fps > 120.0) {
+            System.out.println("Ошибка: FPS должен быть в диапазоне от 1 до 120!");
+            return false;
+        }
         this.fps = fps;
+        return true;
     }
 
-    public int countCharacteristics() {
+    public double countCharacteristics() {
         return this.width * this.fps;
     }
 
     public double calculateMegapixels() {
-        int height = (this.width * 9) / 16;
+        double height = (this.width * 9) / 16;
         return (this.width * height) / 1_000_000.0;
 }
 }
