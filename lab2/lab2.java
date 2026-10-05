@@ -8,7 +8,9 @@ public class lab2 {
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
         ArrayList<WebCamera> cams = new ArrayList<>();
-        
+
+        final int num = 3; 
+
         cams.add(new WebCamera());
         cams.add(new WebCamera("Logitech C270 / C310", 640, 90));
        

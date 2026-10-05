@@ -34,8 +34,8 @@ public class Smartphone extends Camera {
         }
 
         this.nightMode = nightMode;
-        if (currentZoom < 1.0 || currentZoom > 50.0) {
-            System.out.println("Ошибка: зум смартфона должен быть в диапазоне от 1.0 до 50.0, установлено 1.0");
+        if (currentZoom < 0.5 || currentZoom > 50.0) {
+            System.out.println("Ошибка: зум смартфона должен быть в диапазоне от 0.5 до 50.0, установлено 1.0");
             this.currentZoom = 1.0;
         } else {
             this.currentZoom = currentZoom;
@@ -53,7 +53,7 @@ public class Smartphone extends Camera {
             return;
         }
 
-        storage -= 5; 
+        storage = Math.round((storage - 5.0) * 10.0) / 10.0; 
         String fileName = "phone_photo_" + (getImages().size() + 1) + ".jpg";
         addImages(fileName);
         System.out.println("Смартфон [" + model + "] сохранил фото " + megapixels + " Мп."
@@ -71,14 +71,18 @@ public class Smartphone extends Camera {
             System.out.println("Ошибка: время видео должно быть больше 0 сек!");
             return;
         }
+        if (seconds > 86400) {
+            System.out.println("Ошибка: длительность записи не может превышать 86400 сек!");
+            return;
+        }
 
-        int requiredMb = seconds * 4; 
+        long requiredMb = (long) seconds * 4; 
         if (storage < requiredMb) {
             System.out.println("Ошибка: для записи " + seconds + " сек. видео требуется " + requiredMb + " МБ! Не хватает памяти.");
             return;
         }
 
-        storage -= requiredMb;
+        storage = Math.round((storage - requiredMb) * 10.0) / 10.0;
         System.out.println("Смартфон записал видео (" + seconds + " сек). Свободно памяти: " + storage + " МБ");
     }
 
@@ -93,7 +97,8 @@ public class Smartphone extends Camera {
     }
 
     public void randomizeStorage() {
-        this.storage = ThreadLocalRandom.current().nextInt(500, 8001);
+        double randomVal = ThreadLocalRandom.current().nextDouble(500.0, 8000.0);
+        this.storage = Math.round(randomVal * 10.0) / 10.0;
         System.out.println("Память смартфона пересчитана системой: " + this.storage + " МБ");
     }
 
@@ -123,11 +128,11 @@ public class Smartphone extends Camera {
         return true;
     }
 
-    public double getStorageMb() {
+    public double getStorage() {
         return storage;
     }
 
-    public boolean setStorageMb(double storage) {
+    public boolean setStorage(double storage) {
         if (storage < 0) {
             System.out.println("Ошибка: свободная память не может быть меньше 0!");
             return false;

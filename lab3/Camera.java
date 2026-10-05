@@ -4,10 +4,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 public abstract class Camera {
+    private static int nextId = 1;
+    private final int id;
     private String mode;
     private final List<String> images;
 
     public Camera() {
+        this.id = nextId++;
         this.mode = "фото";
         this.images = new ArrayList<>();
     }
@@ -33,6 +36,10 @@ public abstract class Camera {
     public abstract void takePhoto();
     public abstract void recordVideo(int seconds);
     public abstract void zoom(double factor);
+
+    public int getId() {
+        return id;
+    }
 
     public String getMode() {
         return mode;

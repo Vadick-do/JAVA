@@ -21,11 +21,13 @@ public class WebCamera extends Camera{
         this.model = model;
         if (width < 320 || width > 3840) {
             System.out.println("Минимальное значение для ширины экрана 320 пикселей, а максимальное - 3840 пикселей");
+            this.width = 1280.0;
         } else {
             this.width = width;
         }
         if (fps < 1 || fps > 120) {
             System.out.println("Минимальное значение для fps 1, а максимальное - 120");
+            this.fps = 30.0;
         } else {
             this.fps = fps;
         }
@@ -34,15 +36,21 @@ public class WebCamera extends Camera{
     }
 
     public WebCamera(String model, double width, double fps, boolean microphoneActive, double currentZoom) {
-    this(model, width, fps); 
-    this.microActive = microphoneActive;
-    if (currentZoom >= 1.0 && currentZoom <= 4.0) {
-        this.currentZoom = currentZoom;
+        this(model, width, fps); 
+        this.microActive = microphoneActive;
+        if (currentZoom >= 1.0 && currentZoom <= 4.0) {
+            this.currentZoom = currentZoom;
+        } else {
+            this.currentZoom = 1.0;
+        }
     }
-}
 
     public String getModel() {
         return model;
+    }
+
+    public double getWidth() {
+        return width;
     }
 
     public double getWigth() {

@@ -2,7 +2,7 @@ package lab3;
 
 import java.util.concurrent.ThreadLocalRandom;
 
-public class PhotoCamera extends Camera{
+public class PhotoCamera extends Camera {
     private String model;
     private int iso;
     private int battery;
@@ -92,7 +92,7 @@ public class PhotoCamera extends Camera{
     }
 
     public void randomizeIso() {
-        int randomVal = ThreadLocalRandom.current().nextInt(1, 33) * 100;
+        int randomVal = ThreadLocalRandom.current().nextInt(1, 65) * 100;
         this.iso = randomVal;
         System.out.println("Новое случайное ISO: " + this.iso);
     }
