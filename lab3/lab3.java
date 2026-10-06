@@ -72,15 +72,25 @@ public class lab3 {
             if (cam instanceof WebCamera wc) {
                 System.out.println("[Веб-камера] " + wc.getModel() 
                         + " | Разрешение: " + wc.getWidth() + " px | FPS: " + wc.getFPS() 
+                        + " | Зум: " + wc.getCurrentZoom() + "x"
+                        + " | Микрофон: " + (wc.isMicrophoneEnabled() ? "вкл" : "выкл")
                         + " | Режим: " + wc.getMode() + " | Снимков: " + wc.getImages().size());
             } else if (cam instanceof PhotoCamera pc) {
                 System.out.println("[Зеркалка] " + pc.getModel() 
                         + " | ISO: " + pc.getIso() + " | Батарея: " + pc.getBattery() + "%" 
+                        + " | Зум: " + pc.getCurrentZoom() + "x"
+                        + " | Вспышка: " + (pc.isFlashActive() ? "вкл" : "выкл")
                         + " | Режим: " + pc.getMode() + " | Снимков: " + pc.getImages().size());
             } else if (cam instanceof Smartphone sp) {
                 System.out.println("[Смартфон] " + sp.getModel() 
                         + " | Матрица: " + sp.getMegapixels() + " Мп | Память: " + sp.getStorage() + " МБ" 
+                        + " | Зум: " + sp.getCurrentZoom() + "x"
+                        + " | Ночной режим: " + (sp.isNightMode() ? "вкл" : "выкл")
                         + " | Режим: " + sp.getMode() + " | Снимков: " + sp.getImages().size());
+            }
+
+            if (!cam.getImages().isEmpty()) {
+                System.out.println("   Файлы: " + String.join(", ", cam.getImages()));
             }
         }
     }
@@ -147,19 +157,20 @@ public class lab3 {
         }
 
         Camera cam = cams.get(index);
+        System.out.println("(Нажмите Enter без ввода, чтобы оставить текущее значение)");
 
         if (cam instanceof WebCamera wc) {
-            wc.setModel(readString(scanner, "Новая модель (текущая: " + wc.getModel() + "): "));
-            wc.setWidth(readDouble(scanner, "Новая ширина (320 - 3840): ", 320, 3840));
-            wc.setFPS(readDouble(scanner, "Новый FPS (1 - 120): ", 1, 120));
+            wc.setModel(readString(scanner, "Новая модель [" + wc.getModel() + "]: ", wc.getModel()));
+            wc.setWidth(readDouble(scanner, "Новая ширина (320 - 3840) [" + wc.getWidth() + "]: ", 320, 3840, wc.getWidth()));
+            wc.setFPS(readDouble(scanner, "Новый FPS (1 - 120) [" + wc.getFPS() + "]: ", 1, 120, wc.getFPS()));
         } else if (cam instanceof PhotoCamera pc) {
-            pc.setModel(readString(scanner, "Новая модель (текущая: " + pc.getModel() + "): "));
-            pc.setIso(readInt(scanner, "Новое ISO (100 - 6400): ", 100, 6400));
-            pc.setBattery(readInt(scanner, "Новый заряд батареи % (0 - 100): ", 0, 100));
+            pc.setModel(readString(scanner, "Новая модель [" + pc.getModel() + "]: ", pc.getModel()));
+            pc.setIso(readInt(scanner, "Новое ISO (100 - 6400) [" + pc.getIso() + "]: ", 100, 6400, pc.getIso()));
+            pc.setBattery(readInt(scanner, "Новый заряд батареи % (0 - 100) [" + pc.getBattery() + "]: ", 0, 100, pc.getBattery()));
         } else if (cam instanceof Smartphone sp) {
-            sp.setModel(readString(scanner, "Новая модель (текущая: " + sp.getModel() + "): "));
-            sp.setMegapixels(readDouble(scanner, "Новые Мп (2 - 200): ", 2, 200));
-            sp.setStorage(readDouble(scanner, "Новая память МБ (можно дробное): ", 0, 1_000_000));
+            sp.setModel(readString(scanner, "Новая модель [" + sp.getModel() + "]: ", sp.getModel()));
+            sp.setMegapixels(readDouble(scanner, "Новые Мп (2 - 200) [" + sp.getMegapixels() + "]: ", 2, 200, sp.getMegapixels()));
+            sp.setStorage(readDouble(scanner, "Новая память МБ [" + sp.getStorage() + "]: ", 0, 1_000_000, sp.getStorage()));
         }
         System.out.println("Параметры успешно обновлены!");
     }
@@ -212,66 +223,95 @@ public class lab3 {
         }
 
         Camera cam = cams.get(index);
+        boolean inDeviceMenu = true;
 
-        String randomCharText = "Изменить случайную характеристику";
-        String specialActionText = "Специальное действие устройства";
+        while (inDeviceMenu) {
+            String randomCharText = "Изменить случайную характеристику";
+            String specialActionText = "Специальное действие устройства";
 
-        if (cam instanceof WebCamera wc) {
-            randomCharText = "Изменить случайную характеристику (FPS)";
-            specialActionText = "Включить/выключить микрофон (сейчас: " + (wc.isMicrophoneEnabled() ? "вкл" : "выкл") + ")";
-        } else if (cam instanceof PhotoCamera pc) {
-            randomCharText = "Изменить случайную характеристику (ISO)";
-            specialActionText = "Включить/выключить вспышку (сейчас: " + (pc.isFlashActive() ? "вкл" : "выкл") + ")";
-        } else if (cam instanceof Smartphone sp) {
-            randomCharText = "Изменить случайную характеристику (свободная память)";
-            specialActionText = "Включить/выключить ночной режим (сейчас: " + (sp.isNightMode() ? "вкл" : "выкл") + ")";
-        }
+            if (cam instanceof WebCamera wc) {
+                randomCharText = "Изменить случайную характеристику (FPS)";
+                specialActionText = "Включить/выключить микрофон (сейчас: " + (wc.isMicrophoneEnabled() ? "вкл" : "выкл") + ")";
+            } else if (cam instanceof PhotoCamera pc) {
+                randomCharText = "Изменить случайную характеристику (ISO)";
+                specialActionText = "Включить/выключить вспышку (сейчас: " + (pc.isFlashActive() ? "вкл" : "выкл") + ")";
+            } else if (cam instanceof Smartphone sp) {
+                randomCharText = "Изменить случайную характеристику (свободная память)";
+                specialActionText = "Включить/выключить ночной режим (сейчас: " + (sp.isNightMode() ? "вкл" : "выкл") + ")";
+            }
 
-        System.out.println("\n--- Выберите действие с устройством ---");
-        System.out.println("1. Сделать фото");
-        System.out.println("2. Записать видео");
-        System.out.println("3. Изменить зум");
-        System.out.println("4. Переключить режим (фото <-> видео) [текущий: " + cam.getMode() + "]");
-        System.out.println("5. " + randomCharText);
-        System.out.println("6. " + specialActionText);
-        System.out.print("Ваш выбор: ");
+            System.out.println("\n--- Работа с устройством [" + cam.getModel() + "] ---");
+            System.out.println("0. Назад в главное меню");
+            System.out.println("1. Сделать фото");
+            System.out.println("2. Записать видео");
+            System.out.println("3. Изменить зум (текущий: " + cam.getCurrentZoom() + "x)");
+            System.out.println("4. Переключить режим (фото <-> видео) [текущий: " + cam.getMode() + "]");
+            System.out.println("5. " + randomCharText);
+            System.out.println("6. " + specialActionText);
+            System.out.println("7. Посмотреть сделанные снимки");
+            if (cam instanceof PhotoCamera) {
+                System.out.println("8. Зарядить батарею (до 100%)");
+            } else if (cam instanceof Smartphone) {
+                System.out.println("8. Очистить память (до 8192 МБ)");
+            } else if (cam instanceof WebCamera) {
+                System.out.println("8. Рассчитать мегапиксели веб-камеры");
+            }
+            System.out.print("Ваш выбор: ");
 
-        String action = scanner.nextLine().trim();
-        switch (action) {
-            case "1":
-                cam.takePhoto();
-                break;
-            case "2":
-                int sec = readInt(scanner, "Введите длительность видео (сек): ", 1, 86400);
-                cam.recordVideo(sec);
-                break;
-            case "3":
-                double factor = readDouble(scanner, "Введите коэффициент зума: ", 0.1, 100.0);
-                cam.zoom(factor);
-                break;
-            case "4":
-                cam.switchMode();
-                break;
-            case "5":
-                if (cam instanceof WebCamera wc) {
-                    wc.randomizeFps();
-                } else if (cam instanceof PhotoCamera pc) {
-                    pc.randomizeIso();
-                } else if (cam instanceof Smartphone sp) {
-                    sp.randomizeStorage();
-                }
-                break;
-            case "6":
-                if (cam instanceof WebCamera wc) {
-                    wc.toggleMicrophone();
-                } else if (cam instanceof PhotoCamera pc) {
-                    pc.toggleFlash();
-                } else if (cam instanceof Smartphone sp) {
-                    sp.toggleNightMode();
-                }
-                break;
-            default:
-                System.out.println("Неверное действие!");
+            String action = scanner.nextLine().trim();
+            switch (action) {
+                case "0":
+                    inDeviceMenu = false;
+                    break;
+                case "1":
+                    cam.takePhoto();
+                    break;
+                case "2":
+                    int sec = readInt(scanner, "Введите длительность видео (сек): ", 1, 86400);
+                    cam.recordVideo(sec);
+                    break;
+                case "3":
+                    double factor = readDouble(scanner, "Введите коэффициент зума (" + cam.getMinZoom() + " - " + cam.getMaxZoom() + "): ", cam.getMinZoom(), cam.getMaxZoom());
+                    cam.zoom(factor);
+                    break;
+                case "4":
+                    cam.switchMode();
+                    break;
+                case "5":
+                    if (cam instanceof WebCamera wc) {
+                        wc.randomizeFps();
+                    } else if (cam instanceof PhotoCamera pc) {
+                        pc.randomizeIso();
+                    } else if (cam instanceof Smartphone sp) {
+                        sp.randomizeStorage();
+                    }
+                    break;
+                case "6":
+                    if (cam instanceof WebCamera wc) {
+                        wc.toggleMicrophone();
+                    } else if (cam instanceof PhotoCamera pc) {
+                        pc.toggleFlash();
+                    } else if (cam instanceof Smartphone sp) {
+                        sp.toggleNightMode();
+                    }
+                    break;
+                case "7":
+                    cam.printImages();
+                    break;
+                case "8":
+                    if (cam instanceof PhotoCamera pc) {
+                        pc.recharge();
+                    } else if (cam instanceof Smartphone sp) {
+                        sp.clearStorage();
+                    } else if (cam instanceof WebCamera wc) {
+                        System.out.printf("Разрешение веб-камеры: %.2f Мп (при ширине %.0f px)\n", wc.calculateMegapixels(), wc.getWidth());
+                    } else {
+                        System.out.println("Неверное действие!");
+                    }
+                    break;
+                default:
+                    System.out.println("Неверное действие!");
+            }
         }
     }
 
@@ -281,7 +321,7 @@ public class lab3 {
             return;
         }
 
-        System.out.println("\n[Синхронная съемка со всех устройств]:");
+        System.out.println("\nСинхронная съемка со всех устройств:");
         for (Camera cam : cams) {
             if (!"фото".equalsIgnoreCase(cam.getMode())) {
                 cam.switchMode();
@@ -301,28 +341,45 @@ public class lab3 {
         }
     }
 
+    private static String readString(Scanner scanner, String msg, String defaultValue) {
+        System.out.print(msg);
+        String input = scanner.nextLine().trim();
+        if (input.isEmpty()) {
+            return defaultValue;
+        }
+        return input;
+    }
+
     private static int readInt(Scanner scanner, String msg, int min, int max) {
+        while (true) {
+            System.out.print(msg);
+            try {
+                int val = Integer.parseInt(scanner.nextLine().trim());
+                if (val >= min && val <= max) {
+                    return val;
+                }
+                System.out.println("Значение должно быть от " + min + " до " + max + "!");
+            } catch (NumberFormatException e) {
+                System.out.println("Ошибка! Введите целое число.");
+            }
+        }
+    }
+
+    private static int readInt(Scanner scanner, String msg, int min, int max, int defaultValue) {
         while (true) {
             System.out.print(msg);
             String input = scanner.nextLine().trim();
             if (input.isEmpty()) {
-                continue;
-            }
-            if (input.contains(".") || input.contains(",")) {
-                System.out.println("Ошибка! Дробные числа не допускаются, введите целое число.");
-                continue;
+                return defaultValue;
             }
             try {
                 int val = Integer.parseInt(input);
-                if (val < min) {
-                    System.out.println("Ошибка! Значение не может быть меньше " + min + ".");
-                } else if (val > max) {
-                    System.out.println("Ошибка! Значение не может быть больше " + max + ".");
-                } else {
+                if (val >= min && val <= max) {
                     return val;
                 }
+                System.out.println("Значение должно быть от " + min + " до " + max + "!");
             } catch (NumberFormatException e) {
-                System.out.println("Ошибка! Введите корректное целое число.");
+                System.out.println("Ошибка! Введите целое число.");
             }
         }
     }
@@ -330,23 +387,33 @@ public class lab3 {
     private static double readDouble(Scanner scanner, String msg, double min, double max) {
         while (true) {
             System.out.print(msg);
+            try {
+                double val = Double.parseDouble(scanner.nextLine().trim().replace(',', '.'));
+                if (val >= min && val <= max) {
+                    return val;
+                }
+                System.out.println("Значение должно быть от " + min + " до " + max + "!");
+            } catch (NumberFormatException e) {
+                System.out.println("Ошибка! Введите число.");
+            }
+        }
+    }
+
+    private static double readDouble(Scanner scanner, String msg, double min, double max, double defaultValue) {
+        while (true) {
+            System.out.print(msg);
             String input = scanner.nextLine().trim().replace(',', '.');
             if (input.isEmpty()) {
-                continue;
+                return defaultValue;
             }
             try {
                 double val = Double.parseDouble(input);
-                if (Double.isNaN(val) || Double.isInfinite(val)) {
-                    System.out.println("Ошибка! Введено недопустимое число.");
-                } else if (val < min) {
-                    System.out.println("Ошибка! Значение не может быть меньше " + min + ".");
-                } else if (val > max) {
-                    System.out.println("Ошибка! Значение не может быть больше " + max + ".");
-                } else {
+                if (val >= min && val <= max) {
                     return val;
                 }
+                System.out.println("Значение должно быть от " + min + " до " + max + "!");
             } catch (NumberFormatException e) {
-                System.out.println("Ошибка! Введите корректное число.");
+                System.out.println("Ошибка! Введите число.");
             }
         }
     }

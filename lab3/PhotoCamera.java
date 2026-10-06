@@ -1,24 +1,18 @@
 package lab3;
 
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.Random;
 
 public class PhotoCamera extends Camera {
-    private String model;
     private int iso;
     private int battery;
     private boolean flashActive;
-    private double currentZoom;
 
     public PhotoCamera() {
-        this.model = "Sony ZV-1";
-        this.iso = 100;
-        this.battery = 100;
-        this.flashActive = false;
-        this.currentZoom = 1.0;
+        this("Sony ZV-1", 100, 100, false, 1.0);
     }
 
     public PhotoCamera(String model, int iso, int battery, boolean flashActive, double currentZoom) {
-        this.model = model;
+        super(model);
         if (iso < 100 || iso > 6400) {
             System.out.println("Ошибка: ISO должно быть от 100 до 6400. Установлено 100.");
             this.iso = 100;
@@ -44,6 +38,21 @@ public class PhotoCamera extends Camera {
     }
 
     @Override
+    public double getMinZoom() {
+        return 1.0;
+    }
+
+    @Override
+    public double getMaxZoom() {
+        return 10.0;
+    }
+
+    public void recharge() {
+        this.battery = 100;
+        System.out.println("Батарея зеркалки [" + getModel() + "] заряжена на 100%.");
+    }
+
+    @Override
     public void takePhoto() {
         if (!"фото".equalsIgnoreCase(getMode())) {
             System.out.println("Ошибка съемки: зеркалка находится в режиме видео!");
@@ -56,8 +65,8 @@ public class PhotoCamera extends Camera {
 
         battery -= 1; 
         String fileName = "photo_raw_" + (getImages().size() + 1) + ".cr3";
-        addImages(fileName);
-        System.out.println("Зеркалка [" + model + "] щелкнула затвором! ISO: " + iso 
+        addImage(fileName);
+        System.out.println("Зеркалка [" + model + "] сделала фото. ISO: " + iso 
                 + ", Вспышка: " + (flashActive ? "сработала" : "выкл") 
                 + ", Батарея: " + battery + "%. Сохранено: " + fileName);
     }
@@ -83,8 +92,9 @@ public class PhotoCamera extends Camera {
 
     @Override
     public void zoom(double factor) {
-        if (factor < 1.0 || factor > 10.0) {
-            System.out.println("Ошибка: оптический объектив поддерживает зум только от 1.0x до 10.0x!");
+        if (factor < getMinZoom() || factor > getMaxZoom()) {
+            System.out.println("Ошибка: оптический объектив поддерживает зум только от " 
+                    + getMinZoom() + "x до " + getMaxZoom() + "x!");
             return;
         }
         this.currentZoom = factor;
@@ -92,7 +102,8 @@ public class PhotoCamera extends Camera {
     }
 
     public void randomizeIso() {
-        int randomVal = ThreadLocalRandom.current().nextInt(1, 65) * 100;
+        Random random = new Random();
+        int randomVal = (random.nextInt(64) + 1) * 100;
         this.iso = randomVal;
         System.out.println("Новое случайное ISO: " + this.iso);
     }
@@ -100,14 +111,6 @@ public class PhotoCamera extends Camera {
     public void toggleFlash() {
         this.flashActive = !this.flashActive;
         System.out.println("Вспышка зеркалки теперь: " + (flashActive ? "вкл" : "выкл"));
-    }
-
-    public String getModel() {
-        return model;
-    }
-
-    public void setModel(String model) {
-        this.model = model;
     }
 
     public int getIso() {
@@ -138,9 +141,5 @@ public class PhotoCamera extends Camera {
 
     public boolean isFlashActive() {
         return flashActive;
-    }
-
-    public double getCurrentZoom() {
-        return currentZoom;
     }
 }

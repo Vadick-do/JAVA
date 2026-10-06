@@ -1,24 +1,22 @@
 package lab3;
 
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.Random;
 
-public class WebCamera extends Camera{
-    private String model;
+public class WebCamera extends Camera {
     private double width;
     private double fps;
     private boolean microActive;
-    private double currentZoom;
 
     public WebCamera() {
-        this.model = "Стандартная камера";
-        this.width = 1280.0;
-        this.fps = 30.0;
-        this.microActive = true;
-        this.currentZoom = 1.0;
+        this("Стандартная камера", 1280.0, 30.0, true, 1.0);
     }
 
     public WebCamera(String model, double width, double fps) {
-        this.model = model;
+        this(model, width, fps, true, 1.0);
+    }
+
+    public WebCamera(String model, double width, double fps, boolean microphoneActive, double currentZoom) {
+        super(model);
         if (width < 320 || width > 3840) {
             System.out.println("Минимальное значение для ширины экрана 320 пикселей, а максимальное - 3840 пикселей");
             this.width = 1280.0;
@@ -31,12 +29,6 @@ public class WebCamera extends Camera{
         } else {
             this.fps = fps;
         }
-        this.microActive = true;
-        this.currentZoom = 1.0;
-    }
-
-    public WebCamera(String model, double width, double fps, boolean microphoneActive, double currentZoom) {
-        this(model, width, fps); 
         this.microActive = microphoneActive;
         if (currentZoom >= 1.0 && currentZoom <= 4.0) {
             this.currentZoom = currentZoom;
@@ -45,8 +37,14 @@ public class WebCamera extends Camera{
         }
     }
 
-    public String getModel() {
-        return model;
+    @Override
+    public double getMinZoom() {
+        return 1.0;
+    }
+
+    @Override
+    public double getMaxZoom() {
+        return 4.0;
     }
 
     public double getWidth() {
@@ -61,19 +59,11 @@ public class WebCamera extends Camera{
         return fps;
     }
 
-    public void setModel(String model) {
-        this.model = model;
-    }
-
     public boolean isMicrophoneEnabled() {
         return microActive;
     }
 
-    public double getCurrentZoom() {
-        return currentZoom;
-    }
-
-   public boolean setWidth(double width) {
+    public boolean setWidth(double width) {
         if (width < 320.0 || width > 3840.0) {
             System.out.println("Ошибка: ширина экрана должна быть в диапазоне от 320 до 3840 пикселей!");
             return false;
@@ -107,7 +97,7 @@ public class WebCamera extends Camera{
             return;
         }
         String fileName = "webcam_snap_" + (getImages().size() + 1) + ".png";
-        addImages(fileName);
+        addImage(fileName);
         System.out.println("Веб-камера [" + model + "] сделала снимок " 
                 + (int) width + "x" + (int) ((width * 9) / 16) 
                 + " (зум: " + currentZoom + "x). Сохранено в: " + fileName);
@@ -129,8 +119,9 @@ public class WebCamera extends Camera{
 
     @Override 
     public void zoom(double factor) {
-        if (factor < 1.0 || factor > 4.0) {
-            System.out.println("Ошибка: цифровой зум веб-камеры поддерживает значения только от 1.0x до 4.0x!");
+        if (factor < getMinZoom() || factor > getMaxZoom()) {
+            System.out.println("Ошибка: цифровой зум веб-камеры поддерживает значения только от " 
+                    + getMinZoom() + "x до " + getMaxZoom() + "x!");
             return;
         }
         this.currentZoom = factor;
@@ -138,7 +129,8 @@ public class WebCamera extends Camera{
     }
 
     public void randomizeFps() {
-        double randomValue = ThreadLocalRandom.current().nextDouble(15.0, 60.0);
+        Random random = new Random();
+        double randomValue = 15.0 + random.nextDouble() * 45.0;
         this.fps = Math.round(randomValue * 10.0) / 10.0;
         System.out.println("FPS веб-камеры случайно изменен: " + this.fps);
     }

@@ -5,11 +5,11 @@ public class WebCamera {
     private double width;
     private double fps;
 
-    // public WebCamera() {
-    //     this.model = "Стандартная камера";
-    //     this.width = 1280.0;
-    //     this.fps = 30.0;
-    // }
+    public WebCamera() {
+        this.model = "Стандартная камера";
+        this.width = 1280.0;
+        this.fps = 30.0;
+    }
 
     public WebCamera(String model, double width, double fps) {
         this.model = model;

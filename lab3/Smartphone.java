@@ -1,24 +1,18 @@
 package lab3;
 
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.Random;
 
 public class Smartphone extends Camera {
-    private String model;
     private double megapixels;
     private double storage;
     private boolean nightMode;
-    private double currentZoom;
 
     public Smartphone() {
-        this.model = "Iphone 11";
-        this.megapixels = 48.0;
-        this.storage = 8192.0;
-        this.nightMode = false;
-        this.currentZoom = 1.0;
+        this("Iphone 11", 48.0, 8192.0, false, 1.0);
     }
 
     public Smartphone(String model, double megapixels, double storage, boolean nightMode, double currentZoom) {
-        this.model = model;
+        super(model);
         if (megapixels < 2.0 || megapixels > 200.0) {
             System.out.println("Ошибка: мегапиксели должны быть от 2 до 200. Установлено 48.");
             this.megapixels = 48;
@@ -43,6 +37,21 @@ public class Smartphone extends Camera {
     }
 
     @Override
+    public double getMinZoom() {
+        return 0.5;
+    }
+
+    @Override
+    public double getMaxZoom() {
+        return 50.0;
+    }
+
+    public void clearStorage() {
+        this.storage = 8192.0;
+        System.out.println("Память смартфона [" + getModel() + "] очищена (свободно 8192.0 МБ).");
+    }
+
+    @Override
     public void takePhoto() {
         if (!"фото".equalsIgnoreCase(getMode())) {
             System.out.println("Ошибка съемки: камера смартфона сейчас в режиме видео!");
@@ -55,7 +64,7 @@ public class Smartphone extends Camera {
 
         storage = Math.round((storage - 5.0) * 10.0) / 10.0; 
         String fileName = "phone_photo_" + (getImages().size() + 1) + ".jpg";
-        addImages(fileName);
+        addImage(fileName);
         System.out.println("Смартфон [" + model + "] сохранил фото " + megapixels + " Мп."
                 + " Ночной режим: " + (nightMode ? "вкл" : "выкл")
                 + ", Остаток памяти: " + storage + " МБ. Файл: " + fileName);
@@ -88,8 +97,9 @@ public class Smartphone extends Camera {
 
     @Override
     public void zoom(double factor) {
-        if (factor < 0.5 || factor > 50.0) {
-            System.out.println("Ошибка: зум смартфона поддерживает значения от 0.5x (ультраширик) до 50.0x!");
+        if (factor < getMinZoom() || factor > getMaxZoom()) {
+            System.out.println("Ошибка: зум смартфона поддерживает значения от " 
+                    + getMinZoom() + "x (ультраширик) до " + getMaxZoom() + "x!");
             return;
         }
         this.currentZoom = factor;
@@ -97,22 +107,15 @@ public class Smartphone extends Camera {
     }
 
     public void randomizeStorage() {
-        double randomVal = ThreadLocalRandom.current().nextDouble(500.0, 8000.0);
+        Random random = new Random();
+        double randomVal = 500.0 + random.nextDouble() * 7500.0;
         this.storage = Math.round(randomVal * 10.0) / 10.0;
-        System.out.println("Память смартфона пересчитана системой: " + this.storage + " МБ");
+        System.out.println("Память смартфона случайно изменена: " + this.storage + " МБ");
     }
 
     public void toggleNightMode() {
         this.nightMode = !this.nightMode;
-        System.out.println("Ночной режим смартфона (Night Mode): " + (nightMode ? "вкл" : "выкл"));
-    }
-
-    public String getModel() {
-        return model;
-    }
-
-    public void setModel(String model) {
-        this.model = model;
+        System.out.println("Ночной режим смартфона: " + (nightMode ? "вкл" : "выкл"));
     }
 
     public double getMegapixels() {
@@ -144,9 +147,4 @@ public class Smartphone extends Camera {
     public boolean isNightMode() {
         return nightMode;
     }
-
-    public double getCurrentZoom() {
-        return currentZoom;
-    }
 }
-

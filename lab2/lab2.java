@@ -9,11 +9,9 @@ public class lab2 {
         Scanner scanner = new Scanner(System.in);
         ArrayList<WebCamera> cams = new ArrayList<>();
 
-        final int num = 3; 
-
         cams.add(new WebCamera());
         cams.add(new WebCamera("Logitech C270 / C310", 640, 90));
-       
+
         boolean isRunning = true;
         while (isRunning) {
             System.out.println("\n--- МЕНЮ ---");
