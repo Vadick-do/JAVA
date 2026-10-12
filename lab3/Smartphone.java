@@ -64,7 +64,8 @@ public class Smartphone extends Camera {
 
         storage = Math.round((storage - 5.0) * 10.0) / 10.0; 
         String fileName = "phone_photo_" + (getImages().size() + 1) + ".jpg";
-        addImage(fileName);
+        Image image = new Image(fileName, megapixels + " Мп", 5.0, "JPG");
+        addImage(image);
         System.out.println("Смартфон [" + model + "] сохранил фото " + megapixels + " Мп."
                 + " Ночной режим: " + (nightMode ? "вкл" : "выкл")
                 + ", Остаток памяти: " + storage + " МБ. Файл: " + fileName);

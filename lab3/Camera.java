@@ -9,7 +9,7 @@ public abstract class Camera {
     protected String model;
     private String mode;
     protected double currentZoom;
-    private final List<String> images;
+    private final List<Image> images;
 
     public Camera() {
         this("Камера");
@@ -68,7 +68,7 @@ public abstract class Camera {
         return mode;
     }
 
-    public List<String> getImages() {
+    public List<Image> getImages() {
         return images;
     }
 
@@ -83,13 +83,15 @@ public abstract class Camera {
         }
     }
 
-    protected void addImage(String name) {
-        if (name != null && !name.trim().isEmpty()) {
-            this.images.add(name);
+    protected void addImage(Image image) {
+        if (image != null) {
+            this.images.add(image);
         }
     }
 
-    protected void addImages(String name) {
-        addImage(name);
+    protected void addImage(String name) {
+        if (name != null && !name.trim().isEmpty()) {
+            this.images.add(new Image(name));
+        }
     }
 }

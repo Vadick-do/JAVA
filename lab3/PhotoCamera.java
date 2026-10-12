@@ -65,7 +65,8 @@ public class PhotoCamera extends Camera {
 
         battery -= 1; 
         String fileName = "photo_raw_" + (getImages().size() + 1) + ".cr3";
-        addImage(fileName);
+        Image photo = new Image(fileName, "6000x4000", 25.0, "CR3");
+        addImage(photo);
         System.out.println("Зеркалка [" + model + "] сделала фото. ISO: " + iso 
                 + ", Вспышка: " + (flashActive ? "сработала" : "выкл") 
                 + ", Батарея: " + battery + "%. Сохранено: " + fileName);

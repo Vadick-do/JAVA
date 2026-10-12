@@ -97,7 +97,9 @@ public class WebCamera extends Camera {
             return;
         }
         String fileName = "webcam_snap_" + (getImages().size() + 1) + ".png";
-        addImage(fileName);
+        String resolution = (int) width + "x" + (int) ((width * 9) / 16);
+        Image image = new Image(fileName, resolution, 2.0, "PNG");
+        addImage(image);
         System.out.println("Веб-камера [" + model + "] сделала снимок " 
                 + (int) width + "x" + (int) ((width * 9) / 16) 
                 + " (зум: " + currentZoom + "x). Сохранено в: " + fileName);

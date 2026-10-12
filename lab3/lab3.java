@@ -90,7 +90,11 @@ public class lab3 {
             }
 
             if (!cam.getImages().isEmpty()) {
-                System.out.println("   Файлы: " + String.join(", ", cam.getImages()));
+                ArrayList<String> fileNames = new ArrayList<>();
+                for (Image img : cam.getImages()) {
+                    fileNames.add(img.getFileName());
+                }
+                System.out.println("   Файлы: " + String.join(", ", fileNames));
             }
         }
     }
