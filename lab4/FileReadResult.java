@@ -33,6 +33,7 @@ public class FileReadResult {
     }
 
     public void printReport() {
+        System.out.println("\n========== ОТЧЕТ О ЧТЕНИИ ФАЙЛА ==========");
         System.out.println("Найдено и воссоздано объектов: " + objectCount);
         System.out.println("Успешно прочитано свойств:      " + propertiesRead);
         System.out.println("Не найдено (пропущено) свойств: " + propertiesMissing);

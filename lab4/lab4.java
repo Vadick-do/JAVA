@@ -14,6 +14,7 @@ public class lab4 {
         cams.add(new Smartphone("IPhone 15 Pro", 48.0, 5120.0, false, 1.0));
 
         boolean isRunning = true;
+        String dataFileName = "lab4/devices.txt";
         while (isRunning) {
             System.out.println("\n--- МЕНЮ ---");
             System.out.println("0. Выход");
@@ -23,6 +24,9 @@ public class lab4 {
             System.out.println("4. Удалить устройство");
             System.out.println("5. Функциональная работа с устройством");
             System.out.println("6. Сделать фото на все устройства сразу");
+            System.out.println("7. Прочитать данные из файла (текущий: " + dataFileName + ")");
+            System.out.println("8. Изменить название файла с данными");
+
             System.out.print("Выберите действие: ");
 
             String choice = scanner.nextLine().trim();
@@ -49,6 +53,12 @@ public class lab4 {
                     break;
                 case "6":
                     captureAll(cams);
+                    break;
+                case "7":
+                    loadCamerasFromFile(cams, dataFileName);
+                    break;
+                case "8":
+                    dataFileName = changeFileName(scanner, dataFileName);
                     break;
                 default:
                     System.out.println("Такого пункта в меню нет!");
@@ -420,5 +430,50 @@ public class lab4 {
                 System.out.println("Ошибка! Введите число.");
             }
         }
+    }
+
+    private static void loadCamerasFromFile(ArrayList<Camera> cams, String fileName) {
+        System.out.println("\nПопытка чтения данных из файла: " + fileName);
+
+        java.io.File file = new java.io.File(fileName);
+        if (!file.exists()) {
+            java.io.File fallback = new java.io.File("lab4", fileName);
+            if (fallback.exists()) {
+                file = fallback;
+            }
+        }
+
+        try (java.io.FileInputStream fis = new java.io.FileInputStream(file);
+             java.io.InputStreamReader isr = new java.io.InputStreamReader(fis, java.nio.charset.StandardCharsets.UTF_8);
+             java.io.BufferedReader br = new java.io.BufferedReader(isr)) {
+
+            CamerasFileReader fileReader = new CamerasFileReader(br);
+
+            FileReadResult result = fileReader.readAll();
+
+            if (!result.getCams().isEmpty()) {
+                cams.addAll(result.getCams());
+                System.out.println("Успешно добавлено устройств в программу: " + result.getCams().size());
+            } else {
+                System.out.println("Объектов для добавления не найдено.");
+            }
+
+            result.printReport();
+        } catch (java.io.FileNotFoundException e) {
+            System.out.println("Ошибка: файл '" + fileName + "' не найден!");
+        } catch (java.io.IOException e) {
+            System.out.println("Ошибка ввода-вывода при чтении файла: " + e.getMessage());
+        }
+    }
+    public static String changeFileName(Scanner scanner, String currentFileName) {
+        System.out.println("\nТекущее имя файла: " + currentFileName);
+        System.out.print("Введите новое имя файла (или оставьте пустым для отмены): ");
+        String newName = scanner.nextLine().trim();
+        if (newName.isEmpty()) {
+            System.out.println("Имя файла не изменено.");
+            return currentFileName;
+        }
+        System.out.println("Имя файла изменено на: " + newName);
+        return newName;
     }
 }
