@@ -3,7 +3,7 @@
 Type: WebCamera,
 Model: Logitech Brio 4K,
 Width: 3840,
-Fps: 60,
+Fps: y6rhttyhrhgegregregregre gtegegegte te geg erf -123,
 Microphone: true,
 Zoom: 2.0;
 
@@ -12,13 +12,13 @@ dsvsdvdsvdsfvdfsvdsvdvdsvdsfv
 Type: PhotoCamera,
 Model: Sony Alpha A7 IV,
 Iso: 800,
-Battery: 85,
-Flash: false;
+Battery: -85,
+Flash: no;
 
 Type: Smartphone,
 Model: Samsung Galaxy S24,
 Megapixels: 108,
-Storage: 4096,
+Storage: 4096;
 NightMode: true,
 Zoom: 3.0;
 
@@ -27,3 +27,4 @@ dfdsfed: sdfsdfsdfsdfs
 Type: WebCamera,
 Model: Defender Basic,
 Fps: 15;
+
