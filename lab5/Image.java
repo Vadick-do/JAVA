@@ -16,21 +16,18 @@ public class Image {
 
     public Image(String fileName, String resolution, double sizeMb, String format) {
         if (fileName == null || fileName.trim().isEmpty()) {
-            System.out.println("Ошибка: имя файла не может быть пустым. Установлено 'unnamed.jpg'.");
             this.fileName = "unnamed.jpg";
         } else {
             this.fileName = fileName.trim();
         }
 
         if (resolution == null || resolution.trim().isEmpty()) {
-            System.out.println("Ошибка: разрешение не может быть пустым. Установлено '1920x1080'.");
             this.resolution = "1920x1080";
         } else {
             this.resolution = resolution.trim();
         }
 
-        if (sizeMb <= 0) {
-            System.out.println("Ошибка: размер изображения должен быть больше 0 МБ. Установлено 2.0 МБ.");
+        if (!Double.isFinite(sizeMb) || sizeMb <= 0) {
             this.sizeMb = 2.0;
         } else {
             this.sizeMb = Math.round(sizeMb * 10.0) / 10.0;
@@ -67,8 +64,7 @@ public class Image {
 
     public boolean setFileName(String fileName) {
         if (fileName == null || fileName.trim().isEmpty()) {
-            System.out.println("Ошибка: имя файла не может быть пустым!");
-            return false;
+            throw new IllegalArgumentException("Ошибка: имя файла не может быть пустым!");
         }
         this.fileName = fileName.trim();
         return true;
@@ -80,8 +76,7 @@ public class Image {
 
     public boolean setResolution(String resolution) {
         if (resolution == null || resolution.trim().isEmpty()) {
-            System.out.println("Ошибка: разрешение не может быть пустым!");
-            return false;
+            throw new IllegalArgumentException("Ошибка: разрешение не может быть пустым!");
         }
         this.resolution = resolution.trim();
         return true;
@@ -92,9 +87,8 @@ public class Image {
     }
 
     public boolean setSizeMb(double sizeMb) {
-        if (sizeMb <= 0) {
-            System.out.println("Ошибка: размер изображения должен быть больше 0 МБ!");
-            return false;
+        if (!Double.isFinite(sizeMb) || sizeMb <= 0) {
+            throw new IllegalArgumentException("Ошибка: размер изображения должен быть больше 0 МБ!");
         }
         this.sizeMb = Math.round(sizeMb * 10.0) / 10.0;
         return true;
@@ -106,8 +100,7 @@ public class Image {
 
     public boolean setFormat(String format) {
         if (format == null || format.trim().isEmpty()) {
-            System.out.println("Ошибка: формат файла не может быть пустым!");
-            return false;
+            throw new IllegalArgumentException("Ошибка: формат файла не может быть пустым!");
         }
         this.format = format.trim().toUpperCase();
         return true;
@@ -115,11 +108,6 @@ public class Image {
 
     public double getSizeKb() {
         return Math.round((this.sizeMb * 1024.0) * 10.0) / 10.0;
-    }
-
-    public void printInfo() {
-        System.out.println("Снимок: " + fileName + " | Формат: " + format 
-                + " | Разрешение: " + resolution + " | Размер: " + sizeMb + " МБ");
     }
 
     @Override

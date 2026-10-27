@@ -13,6 +13,7 @@ import java.util.Map;
 
 public class CamerasFileReader {
     private final BufferedReader reader;
+    private final List<String> warnings = new ArrayList<>();
     private int propertiesRead = 0;
     private int propertiesMissing = 0;
 
@@ -30,6 +31,7 @@ public class CamerasFileReader {
 
     public FileReadResult readAll() throws IOException {
         List<Camera> cams = new ArrayList<>();
+        warnings.clear();
         propertiesRead = 0;
         propertiesMissing = 0;
 
@@ -84,7 +86,7 @@ public class CamerasFileReader {
             }
         }
 
-        return new FileReadResult(cams, cams.size(), propertiesRead, propertiesMissing);
+        return new FileReadResult(cams, cams.size(), propertiesRead, propertiesMissing, warnings);
     }
 
     private Camera createCamera(String type, Map<String, String> fields) {
@@ -95,19 +97,19 @@ public class CamerasFileReader {
             case "веб-камера":
             case "вебкамера":
                 return parseWebCamera(fields);
-            
+
             case "photocamera":
             case "зеркалка":
             case "фотокамера":
                 return parsePhotoCamera(fields);
-            
+
             case "smartphone":
             case "смартфон":
             case "телефон":
                 return parseSmartphone(fields);
-            
+
             default:
-                System.out.println("Предупреждение: неизвестный тип устройства '" + type + "', объект пропущен.");
+                warnings.add("Предупреждение: неизвестный тип устройства '" + type + "', объект пропущен.");
                 return null;
         }
     }
@@ -129,15 +131,15 @@ public class CamerasFileReader {
         if (fields.containsKey("width")) {
             try {
                 double val = Double.parseDouble(fields.get("width").trim().replace(',', '.'));
-                if (val >= 320.0 && val <= 3840.0) {
+                if (Double.isFinite(val) && val >= 320.0 && val <= 3840.0) {
                     width = val;
                     propertiesRead++;
                 } else {
-                    System.out.println("Ошибка валидации: ширина должна быть от 320 до 3840 (" + val + "). Взято: 1280.0");
+                    warnings.add("Ошибка валидации: ширина должна быть от 320 до 3840 (" + val + "). Взято: 1280.0");
                     propertiesMissing++;
                 }
             } catch (NumberFormatException e) {
-                System.out.println("Ошибка валидации: неверный формат ширины. Взято: 1280.0");
+                warnings.add("Ошибка валидации: неверный формат ширины. Взято: 1280.0");
                 propertiesMissing++;
             }
         } else {
@@ -147,15 +149,15 @@ public class CamerasFileReader {
         if (fields.containsKey("fps")) {
             try {
                 double val = Double.parseDouble(fields.get("fps").trim().replace(',', '.'));
-                if (val >= 1.0 && val <= 120.0) {
+                if (Double.isFinite(val) && val >= 1.0 && val <= 120.0) {
                     fps = val;
                     propertiesRead++;
                 } else {
-                    System.out.println("Ошибка валидации: FPS должен быть от 1 до 120 (" + val + "). Взято: 30.0");
+                    warnings.add("Ошибка валидации: FPS должен быть от 1 до 120 (" + val + "). Взято: 30.0");
                     propertiesMissing++;
                 }
             } catch (NumberFormatException e) {
-                System.out.println("Ошибка валидации: неверный формат FPS. Взято: 30.0");
+                warnings.add("Ошибка валидации: неверный формат FPS. Взято: 30.0");
                 propertiesMissing++;
             }
         } else {
@@ -169,7 +171,7 @@ public class CamerasFileReader {
                 micro = val;
                 propertiesRead++;
             } else {
-                System.out.println("Ошибка валидации: неверный формат микрофона. Взято: true");
+                warnings.add("Ошибка валидации: неверный формат микрофона. Взято: true");
                 propertiesMissing++;
             }
         } else {
@@ -179,15 +181,15 @@ public class CamerasFileReader {
         if (fields.containsKey("zoom")) {
             try {
                 double val = Double.parseDouble(fields.get("zoom").trim().replace(',', '.'));
-                if (val >= 1.0 && val <= 4.0) {
+                if (Double.isFinite(val) && val >= 1.0 && val <= 4.0) {
                     zoom = val;
                     propertiesRead++;
                 } else {
-                    System.out.println("Ошибка валидации: зум веб-камеры должен быть от 1.0 до 4.0 (" + val + "). Взято: 1.0");
+                    warnings.add("Ошибка валидации: зум веб-камеры должен быть от 1.0 до 4.0 (" + val + "). Взято: 1.0");
                     propertiesMissing++;
                 }
             } catch (NumberFormatException e) {
-                System.out.println("Ошибка валидации: неверный формат зума. Взято: 1.0");
+                warnings.add("Ошибка валидации: неверный формат зума. Взято: 1.0");
                 propertiesMissing++;
             }
         } else {
@@ -216,17 +218,17 @@ public class CamerasFileReader {
                     iso = val;
                     propertiesRead++;
                 } else {
-                    System.out.println("Ошибка валидации: ISO должно быть от 100 до 6400 (" + val + "). Взято: 100");
+                    warnings.add("Ошибка валидации: ISO должно быть от 100 до 6400 (" + val + "). Взято: 100");
                     propertiesMissing++;
                 }
             } catch (NumberFormatException e) {
-                System.out.println("Ошибка валидации: неверный формат ISO. Взято: 100");
+                warnings.add("Ошибка валидации: неверный формат ISO. Взято: 100");
                 propertiesMissing++;
             }
         } else {
             propertiesMissing++;
         }
-   
+
         if (fields.containsKey("battery")) {
             try {
                 int val = Integer.parseInt(fields.get("battery").trim());
@@ -234,11 +236,11 @@ public class CamerasFileReader {
                     battery = val;
                     propertiesRead++;
                 } else {
-                    System.out.println("Ошибка валидации: заряд батареи должен быть от 0 до 100 (" + val + "). Взято: 100");
+                    warnings.add("Ошибка валидации: заряд батареи должен быть от 0 до 100 (" + val + "). Взято: 100");
                     propertiesMissing++;
                 }
             } catch (NumberFormatException e) {
-                System.out.println("Ошибка валидации: неверный формат батареи. Взято: 100");
+                warnings.add("Ошибка валидации: неверный формат батареи. Взято: 100");
                 propertiesMissing++;
             }
         } else {
@@ -251,7 +253,7 @@ public class CamerasFileReader {
                 flash = val;
                 propertiesRead++;
             } else {
-                System.out.println("Ошибка валидации: неверный формат вспышки. Взято: false");
+                warnings.add("Ошибка валидации: неверный формат вспышки. Взято: false");
                 propertiesMissing++;
             }
         } else {
@@ -261,15 +263,15 @@ public class CamerasFileReader {
         if (fields.containsKey("zoom")) {
             try {
                 double val = Double.parseDouble(fields.get("zoom").trim().replace(',', '.'));
-                if (val >= 1.0 && val <= 10.0) {
+                if (Double.isFinite(val) && val >= 1.0 && val <= 10.0) {
                     zoom = val;
                     propertiesRead++;
                 } else {
-                    System.out.println("Ошибка валидации: зум зеркалки должен быть от 1.0 до 10.0 (" + val + "). Взято: 1.0");
+                    warnings.add("Ошибка валидации: зум зеркалки должен быть от 1.0 до 10.0 (" + val + "). Взято: 1.0");
                     propertiesMissing++;
                 }
             } catch (NumberFormatException e) {
-                System.out.println("Ошибка валидации: неверный формат зума. Взято: 1.0");
+                warnings.add("Ошибка валидации: неверный формат зума. Взято: 1.0");
                 propertiesMissing++;
             }
         } else {
@@ -294,15 +296,15 @@ public class CamerasFileReader {
         if (fields.containsKey("megapixels")) {
             try {
                 double val = Double.parseDouble(fields.get("megapixels").trim().replace(',', '.'));
-                if (val >= 2.0 && val <= 200.0) {
+                if (Double.isFinite(val) && val >= 2.0 && val <= 200.0) {
                     megapixels = val;
                     propertiesRead++;
                 } else {
-                    System.out.println("Ошибка валидации: мегапиксели должны быть от 2 до 200 (" + val + "). Взято: 48.0");
+                    warnings.add("Ошибка валидации: мегапиксели должны быть от 2 до 200 (" + val + "). Взято: 48.0");
                     propertiesMissing++;
                 }
             } catch (NumberFormatException e) {
-                System.out.println("Ошибка валидации: неверный формат мегапикселей. Взято: 48.0");
+                warnings.add("Ошибка валидации: неверный формат мегапикселей. Взято: 48.0");
                 propertiesMissing++;
             }
         } else {
@@ -312,15 +314,15 @@ public class CamerasFileReader {
         if (fields.containsKey("storage")) {
             try {
                 double val = Double.parseDouble(fields.get("storage").trim().replace(',', '.'));
-                if (val >= 0.0) {
+                if (Double.isFinite(val) && val >= 0.0) {
                     storage = val;
                     propertiesRead++;
                 } else {
-                    System.out.println("Ошибка валидации: свободная память не может быть меньше 0 (" + val + "). Взято: 8192.0");
+                    warnings.add("Ошибка валидации: свободная память не может быть меньше 0 (" + val + "). Взято: 8192.0");
                     propertiesMissing++;
                 }
             } catch (NumberFormatException e) {
-                System.out.println("Ошибка валидации: неверный формат памяти. Взято: 8192.0");
+                warnings.add("Ошибка валидации: неверный формат памяти. Взято: 8192.0");
                 propertiesMissing++;
             }
         } else {
@@ -334,7 +336,7 @@ public class CamerasFileReader {
                 nightMode = val;
                 propertiesRead++;
             } else {
-                System.out.println("Ошибка валидации: неверный формат ночного режима. Взято: false");
+                warnings.add("Ошибка валидации: неверный формат ночного режима. Взято: false");
                 propertiesMissing++;
             }
         } else {
@@ -344,15 +346,15 @@ public class CamerasFileReader {
         if (fields.containsKey("zoom")) {
             try {
                 double val = Double.parseDouble(fields.get("zoom").trim().replace(',', '.'));
-                if (val >= 0.5 && val <= 50.0) {
+                if (Double.isFinite(val) && val >= 0.5 && val <= 50.0) {
                     zoom = val;
                     propertiesRead++;
                 } else {
-                    System.out.println("Ошибка валидации: зум смартфона должен быть от 0.5 до 50.0 (" + val + "). Взято: 1.0");
+                    warnings.add("Ошибка валидации: зум смартфона должен быть от 0.5 до 50.0 (" + val + "). Взято: 1.0");
                     propertiesMissing++;
                 }
             } catch (NumberFormatException e) {
-                System.out.println("Ошибка валидации: неверный формат зума. Взято: 1.0");
+                warnings.add("Ошибка валидации: неверный формат зума. Взято: 1.0");
                 propertiesMissing++;
             }
         } else {
@@ -360,7 +362,7 @@ public class CamerasFileReader {
         }
         return new Smartphone(model, megapixels, storage, nightMode, zoom);
     }
-    
+
     private Boolean parseBooleanSafe(String val) {
         if (val == null) {
             return null;

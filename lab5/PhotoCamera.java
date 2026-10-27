@@ -14,14 +14,12 @@ public class PhotoCamera extends Camera {
     public PhotoCamera(String model, int iso, int battery, boolean flashActive, double currentZoom) {
         super(model);
         if (iso < 100 || iso > 6400) {
-            System.out.println("Ошибка: ISO должно быть от 100 до 6400. Установлено 100.");
             this.iso = 100;
         } else {
             this.iso = iso;
         }
 
         if (battery < 0 || battery > 100) {
-            System.out.println("Ошибка: заряд батареи должен быть от 0 до 100%. Установлено 100%.");
             this.battery = 100;
         } else {
             this.battery = battery;
@@ -29,8 +27,7 @@ public class PhotoCamera extends Camera {
 
         this.flashActive = flashActive;
 
-        if (currentZoom < 1.0 || currentZoom > 10.0) {
-            System.out.println("Ошибка: зум фотокамеры должен быть в диапазоне от 1.0 до 10.0, установлено 1.0");
+        if (!Double.isFinite(currentZoom) || currentZoom < 1.0 || currentZoom > 10.0) {
             this.currentZoom = 1.0;
         } else {
             this.currentZoom = currentZoom;
@@ -49,69 +46,55 @@ public class PhotoCamera extends Camera {
 
     public void recharge() {
         this.battery = 100;
-        System.out.println("Батарея зеркалки [" + getModel() + "] заряжена на 100%.");
     }
 
     @Override
     public void takePhoto() {
         if (!"фото".equalsIgnoreCase(getMode())) {
-            System.out.println("Ошибка съемки: зеркалка находится в режиме видео!");
-            return;
+            throw new IllegalStateException("Ошибка съемки: зеркалка находится в режиме видео!");
         }
         if (battery < 5) {
-            System.out.println("Ошибка: батарея зеркалки разряжена для съемки!");
-            return;
+            throw new IllegalStateException("Ошибка: батарея зеркалки разряжена для съемки!");
         }
 
-        battery -= 1; 
+        battery -= 1;
         String fileName = "photo_raw_" + (getImages().size() + 1) + ".cr3";
         Image photo = new Image(fileName, "6000x4000", 25.0, "CR3");
         addImage(photo);
-        System.out.println("Зеркалка [" + model + "] сделала фото. ISO: " + iso 
-                + ", Вспышка: " + (flashActive ? "сработала" : "выкл") 
-                + ", Батарея: " + battery + "%. Сохранено: " + fileName);
     }
 
     @Override
     public void recordVideo(int seconds) {
         if (!"видео".equalsIgnoreCase(getMode())) {
-            System.out.println("Ошибка записи: зеркалка находится в режиме фото!");
-            return;
+            throw new IllegalStateException("Ошибка записи: зеркалка находится в режиме фото!");
         }
         if (seconds <= 0) {
-            System.out.println("Ошибка: длительность записи должна быть больше 0 сек!");
-            return;
+            throw new IllegalStateException("Ошибка: длительность записи должна быть больше 0 сек!");
         }
         if (battery < 10) {
-            System.out.println("Ошибка: недостаточно заряда для записи видео!");
-            return;
+            throw new IllegalStateException("Ошибка: недостаточно заряда для записи видео!");
         }
 
-        battery -= 5; 
-        System.out.println("Зеркалка записала видео " + seconds + " сек. Батарея: " + battery + "%");
+        battery -= 5;
     }
 
     @Override
     public void zoom(double factor) {
-        if (factor < getMinZoom() || factor > getMaxZoom()) {
-            System.out.println("Ошибка: оптический объектив поддерживает зум только от " 
+        if (!Double.isFinite(factor) || factor < getMinZoom() || factor > getMaxZoom()) {
+            throw new IllegalArgumentException("Ошибка: оптический объектив поддерживает зум только от "
                     + getMinZoom() + "x до " + getMaxZoom() + "x!");
-            return;
         }
         this.currentZoom = factor;
-        System.out.println("Кольцо объектива повернуто. Оптический зум: " + this.currentZoom + "x");
     }
 
     public void randomizeIso() {
         Random random = new Random();
         int randomVal = (random.nextInt(64) + 1) * 100;
         this.iso = randomVal;
-        System.out.println("Новое случайное ISO: " + this.iso);
     }
 
     public void toggleFlash() {
         this.flashActive = !this.flashActive;
-        System.out.println("Вспышка зеркалки теперь: " + (flashActive ? "вкл" : "выкл"));
     }
 
     public int getIso() {
@@ -120,8 +103,7 @@ public class PhotoCamera extends Camera {
 
     public boolean setIso(int iso) {
         if (iso < 100 || iso > 6400) {
-            System.out.println("Ошибка: ISO должно быть от 100 до 6400!");
-            return false;
+            throw new IllegalArgumentException("Ошибка: ISO должно быть от 100 до 6400!");
         }
         this.iso = iso;
         return true;
@@ -133,8 +115,7 @@ public class PhotoCamera extends Camera {
 
     public boolean setBattery(int battery) {
         if (battery < 0 || battery > 100) {
-            System.out.println("Ошибка: уровень заряда должен быть от 0 до 100%!");
-            return false;
+            throw new IllegalArgumentException("Ошибка: уровень заряда должен быть от 0 до 100%!");
         }
         this.battery = battery;
         return true;

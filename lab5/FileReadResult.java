@@ -5,12 +5,14 @@ import java.util.List;
 
 public class FileReadResult {
     private final List<Camera> cams;
+    private final List<String> warnings;
     private final int objectCount;
     private final int propertiesRead;
     private final int propertiesMissing;
 
-    public FileReadResult(List<Camera> cams, int objectCount, int propertiesRead, int propertiesMissing) {
+    public FileReadResult(List<Camera> cams, int objectCount, int propertiesRead, int propertiesMissing, List<String> warnings) {
         this.cams = cams != null ? cams : new ArrayList<>();
+        this.warnings = warnings != null ? new ArrayList<>(warnings) : new ArrayList<>();
         this.objectCount = objectCount;
         this.propertiesRead = propertiesRead;
         this.propertiesMissing = propertiesMissing;
@@ -18,6 +20,10 @@ public class FileReadResult {
 
     public List<Camera> getCams() {
         return cams;
+    }
+
+    public List<String> getWarnings() {
+        return warnings;
     }
 
     public int getObjectCount() {
@@ -32,11 +38,4 @@ public class FileReadResult {
         return propertiesMissing;
     }
 
-    public void printReport() {
-        System.out.println("\n========== ОТЧЕТ О ЧТЕНИИ ФАЙЛА ==========");
-        System.out.println("Найдено и воссоздано объектов: " + objectCount);
-        System.out.println("Успешно прочитано свойств:      " + propertiesRead);
-        System.out.println("Не найдено (пропущено) свойств: " + propertiesMissing);
-        System.out.println("==========================================");
-    }
 }

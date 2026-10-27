@@ -17,7 +17,7 @@ public abstract class Camera {
 
     public Camera(String model) {
         this.id = nextId++;
-        this.model = model;
+        this.model = model == null || model.trim().isEmpty() ? "Камера" : model.trim();
         this.mode = "фото";
         this.images = new ArrayList<>();
         this.currentZoom = 1.0;
@@ -29,7 +29,6 @@ public abstract class Camera {
         } else {
             this.mode = "фото";
         }
-        System.out.println("Режим изменен на: " + this.mode);
     }
 
     public boolean setMode(String mode) {
@@ -37,8 +36,7 @@ public abstract class Camera {
             this.mode = mode.toLowerCase();
             return true;
         }
-        System.out.println("Ошибка: допустимы только режимы 'фото' или 'видео'!");
-        return false;
+        throw new IllegalArgumentException("Ошибка: допустимы только режимы 'фото' или 'видео'!");
     }
 
     public abstract void takePhoto();
@@ -57,7 +55,10 @@ public abstract class Camera {
     }
 
     public void setModel(String model) {
-        this.model = model;
+        if (model == null || model.trim().isEmpty()) {
+            throw new IllegalArgumentException("Ошибка: модель не может быть пустой!");
+        }
+        this.model = model.trim();
     }
 
     public double getCurrentZoom() {
@@ -70,17 +71,6 @@ public abstract class Camera {
 
     public List<Image> getImages() {
         return images;
-    }
-
-    public void printImages() {
-        if (images.isEmpty()) {
-            System.out.println("Список снимков пуст.");
-            return;
-        }
-        System.out.println("Список сохраненных снимков (" + images.size() + " шт.):");
-        for (int i = 0; i < images.size(); i++) {
-            System.out.println("  " + (i + 1) + ". " + images.get(i));
-        }
     }
 
     protected void addImage(Image image) {
