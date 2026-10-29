@@ -23,6 +23,20 @@ public class ConsoleView {
         return scanner.nextLine().trim();
     }
 
+    public void showHelp(String dataFileName) {
+        System.out.println("Использование: java -jar build/lab5/lab5.jar <режим> [параметры]");
+        System.out.println("Режимы работы:");
+        System.out.println("  --help, -h                   Показать справку");
+        System.out.println("  --interactive                Работа через меню, как в ЛР4");
+        System.out.println("  --show                       Один раз вывести состояние устройств из файла");
+        System.out.println("  --replace <источник> <цель>   Заменить содержимое цели содержимым источника");
+        System.out.println("Параметры:");
+        System.out.println("  --file <имя>                 Файл данных для --show или --interactive");
+        System.out.println("Файл по умолчанию: " + dataFileName);
+        System.out.println("При --replace исходный файл сохраняется. Если цели нет, она создается.");
+        System.out.println("Без ключей выводится справка.");
+    }
+
     public void showMenu(String dataFileName) {
         System.out.println("\n--- МЕНЮ ---");
         System.out.println("0. Выход");

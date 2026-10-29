@@ -1,26 +1,107 @@
 package lab5;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.NoSuchElementException;
 
 public class CameraController {
     private final ArrayList<Camera> cams;
     private final ConsoleView view;
+    private final CamerasFileManager fileManager;
     private String dataFileName;
 
     public CameraController(ConsoleView view) {
         this.view = view;
         this.cams = new ArrayList<>();
+        this.fileManager = new CamerasFileManager();
         this.dataFileName = new File("lab5/devices.txt").exists() ? "lab5/devices.txt" : "devices.txt";
     }
 
-    public void run() {
+    public int run(String[] args) {
+        String action = null;
+        String fileName = dataFileName;
+        String sourceName = null;
+        String targetName = null;
+        boolean fileSpecified = false;
+
+        try {
+            for (int i = 0; i < args.length; i++) {
+                switch (args[i]) {
+                    case "--help":
+                    case "-h":
+                    case "--interactive":
+                    case "--show":
+                    case "--replace":
+                        if (action != null) {
+                            throw new IllegalArgumentException("Нужно выбрать только один режим работы.");
+                        }
+                        action = args[i].equals("-h") ? "--help" : args[i];
+                        if (action.equals("--replace")) {
+                            sourceName = getArgument(args, i + 1, "--replace");
+                            targetName = getArgument(args, i + 2, "--replace");
+                            i += 2;
+                        }
+                        break;
+                    case "--file":
+                        if (fileSpecified) {
+                            throw new IllegalArgumentException("Имя файла можно указать только один раз.");
+                        }
+                        fileName = getArgument(args, i + 1, "--file");
+                        fileSpecified = true;
+                        i++;
+                        break;
+                    default:
+                        throw new IllegalArgumentException("Неизвестный ключ: " + args[i]);
+                }
+            }
+
+            if (action == null) {
+                if (fileSpecified) {
+                    throw new IllegalArgumentException("Для ключа --file нужно выбрать --show или --interactive.");
+                }
+                view.showHelp(dataFileName);
+                return 0;
+            }
+            if (fileSpecified && !action.equals("--show") && !action.equals("--interactive")) {
+                throw new IllegalArgumentException("Ключ --file используется только с --show или --interactive.");
+            }
+
+            switch (action) {
+                case "--help":
+                    view.showHelp(dataFileName);
+                    break;
+                case "--interactive":
+                    dataFileName = fileName;
+                    runInteractive();
+                    break;
+                case "--show":
+                    showCamerasFromFile(fileName);
+                    break;
+                case "--replace":
+                    fileManager.replaceFile(sourceName, targetName);
+                    view.showMessage("Файл '" + targetName + "' заменен содержимым файла '" + sourceName + "'.");
+                    break;
+            }
+            return 0;
+        } catch (IllegalArgumentException e) {
+            view.showMessage("Ошибка: " + e.getMessage());
+            view.showHelp(dataFileName);
+            return 2;
+        } catch (IOException e) {
+            view.showMessage("Ошибка ввода-вывода: " + e.getMessage());
+            return 1;
+        }
+    }
+
+    private String getArgument(String[] args, int index, String key) {
+        if (index >= args.length || args[index].isBlank() || args[index].startsWith("--") || args[index].equals("-h")) {
+            throw new IllegalArgumentException("Не указан файл для ключа " + key + ".");
+        }
+        return args[index];
+    }
+
+    private void runInteractive() {
         cams.add(new WebCamera("Logitech C270", 1280.0, 30.0));
         cams.add(new PhotoCamera("Canon EOS R6", 400, 90, false, 2.0));
         cams.add(new Smartphone("IPhone 15 Pro", 48.0, 5120.0, false, 1.0));
@@ -260,7 +341,7 @@ public class CameraController {
                         } else if (cam instanceof Smartphone sp) {
                             sp.clearStorage();
                             view.showDeviceReset(cam);
-                        } else if (cam instanceof WebCamera wc) {
+                        } else if (cam instanceof WebCamera) {
                             view.showDeviceReset(cam);
                         } else {
                             view.showMessage("Неверное действие!");
@@ -299,21 +380,8 @@ public class CameraController {
     private void loadCamerasFromFile(String fileName) {
         view.showMessage("\nПопытка чтения данных из файла: " + fileName);
 
-        File file = new File(fileName);
-        if (!file.exists()) {
-            File fallback = new File("lab5", fileName);
-            if (fallback.exists()) {
-                file = fallback;
-            }
-        }
-
-        try (FileInputStream fis = new FileInputStream(file);
-             InputStreamReader isr = new InputStreamReader(fis, StandardCharsets.UTF_8);
-             BufferedReader br = new BufferedReader(isr)) {
-
-            CamerasFileReader fileReader = new CamerasFileReader(br);
-
-            FileReadResult result = fileReader.readAll();
+        try {
+            FileReadResult result = fileManager.readFile(fileName);
 
             if (!result.getCams().isEmpty()) {
                 cams.addAll(result.getCams());
@@ -326,6 +394,14 @@ public class CameraController {
         } catch (IOException e) {
             view.showMessage("Ошибка ввода-вывода при чтении файла: " + e.getMessage());
         }
+    }
+
+    private void showCamerasFromFile(String fileName) throws IOException {
+        FileReadResult result = fileManager.readFile(fileName);
+        cams.clear();
+        cams.addAll(result.getCams());
+        view.printCameras(cams);
+        view.printReport(result);
     }
 
     public void changeFileName() {
