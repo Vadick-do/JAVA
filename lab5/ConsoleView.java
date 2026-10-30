@@ -29,12 +29,21 @@ public class ConsoleView {
         System.out.println("  --help, -h                   Показать справку");
         System.out.println("  --interactive                Работа через меню, как в ЛР4");
         System.out.println("  --show                       Один раз вывести состояние устройств из файла");
+        System.out.println("  --watch                      Периодически читать файл и выводить состояние устройств");
         System.out.println("  --replace <источник> <цель>   Заменить содержимое цели содержимым источника");
         System.out.println("Параметры:");
-        System.out.println("  --file <имя>                 Файл данных для --show или --interactive");
+        System.out.println("  --file <имя>                 Файл данных для --show, --watch или --interactive");
+        System.out.println("  --interval <секунды>         Период чтения и вывода для --watch, по умолчанию 5");
         System.out.println("Файл по умолчанию: " + dataFileName);
         System.out.println("При --replace исходный файл сохраняется. Если цели нет, она создается.");
         System.out.println("Без ключей выводится справка.");
+    }
+
+    public void showWatchStart(String fileName, int interval) {
+        System.out.println("\nПериодическое чтение файла: " + fileName);
+        System.out.println("Интервал: " + interval + " сек.");
+        System.out.println("При ошибке чтения попытка повторится через указанный интервал.");
+        System.out.println("Для завершения нажмите Ctrl+C.");
     }
 
     public void showMenu(String dataFileName) {

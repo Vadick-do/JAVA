@@ -24,6 +24,8 @@ public class CameraController {
         String sourceName = null;
         String targetName = null;
         boolean fileSpecified = false;
+        int interval = 5;
+        boolean intervalSpecified = false;
 
         try {
             for (int i = 0; i < args.length; i++) {
@@ -32,6 +34,7 @@ public class CameraController {
                     case "-h":
                     case "--interactive":
                     case "--show":
+                    case "--watch":
                     case "--replace":
                         if (action != null) {
                             throw new IllegalArgumentException("Нужно выбрать только один режим работы.");
@@ -51,6 +54,21 @@ public class CameraController {
                         fileSpecified = true;
                         i++;
                         break;
+                    case "--interval":
+                        if (intervalSpecified) {
+                            throw new IllegalArgumentException("Интервал можно указать только один раз.");
+                        }
+                        try {
+                            interval = Integer.parseInt(getArgument(args, i + 1, "--interval"));
+                        } catch (NumberFormatException e) {
+                            throw new IllegalArgumentException("Интервал должен быть целым числом секунд от 1 до " + Integer.MAX_VALUE + ".");
+                        }
+                        if (interval <= 0) {
+                            throw new IllegalArgumentException("Интервал должен быть больше 0 секунд.");
+                        }
+                        intervalSpecified = true;
+                        i++;
+                        break;
                     default:
                         throw new IllegalArgumentException("Неизвестный ключ: " + args[i]);
                 }
@@ -58,13 +76,19 @@ public class CameraController {
 
             if (action == null) {
                 if (fileSpecified) {
-                    throw new IllegalArgumentException("Для ключа --file нужно выбрать --show или --interactive.");
+                    throw new IllegalArgumentException("Для ключа --file нужно выбрать --show, --watch или --interactive.");
+                }
+                if (intervalSpecified) {
+                    throw new IllegalArgumentException("Для ключа --interval нужно выбрать --watch.");
                 }
                 view.showHelp(dataFileName);
                 return 0;
             }
-            if (fileSpecified && !action.equals("--show") && !action.equals("--interactive")) {
-                throw new IllegalArgumentException("Ключ --file используется только с --show или --interactive.");
+            if (fileSpecified && !action.equals("--show") && !action.equals("--watch") && !action.equals("--interactive")) {
+                throw new IllegalArgumentException("Ключ --file используется только с --show, --watch или --interactive.");
+            }
+            if (intervalSpecified && !action.equals("--watch")) {
+                throw new IllegalArgumentException("Ключ --interval используется только с --watch.");
             }
 
             switch (action) {
@@ -77,6 +101,9 @@ public class CameraController {
                     break;
                 case "--show":
                     showCamerasFromFile(fileName);
+                    break;
+                case "--watch":
+                    watchCamerasFromFile(fileName, interval);
                     break;
                 case "--replace":
                     fileManager.replaceFile(sourceName, targetName);
@@ -96,7 +123,7 @@ public class CameraController {
 
     private String getArgument(String[] args, int index, String key) {
         if (index >= args.length || args[index].isBlank() || args[index].startsWith("--") || args[index].equals("-h")) {
-            throw new IllegalArgumentException("Не указан файл для ключа " + key + ".");
+            throw new IllegalArgumentException("Не указано значение для ключа " + key + ".");
         }
         return args[index];
     }
@@ -402,6 +429,23 @@ public class CameraController {
         cams.addAll(result.getCams());
         view.printCameras(cams);
         view.printReport(result);
+    }
+
+    private void watchCamerasFromFile(String fileName, int interval) {
+        view.showWatchStart(fileName, interval);
+        while (!Thread.currentThread().isInterrupted()) {
+            try {
+                showCamerasFromFile(fileName);
+            } catch (IOException e) {
+                view.showMessage("Ошибка ввода-вывода при чтении файла: " + e.getMessage());
+            }
+
+            try {
+                Thread.sleep(interval * 1000L);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
     }
 
     public void changeFileName() {
