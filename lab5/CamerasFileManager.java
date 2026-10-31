@@ -28,6 +28,19 @@ public class CamerasFileManager {
         }
     }
 
+    public void checkLogFile(String fileName, String csvFileName) throws IOException {
+        File source = new File(fileName);
+        File target = new File(csvFileName);
+        if (isSameFile(source, target) || (!source.isAbsolute() && isSameFile(new File("lab5", fileName), target))) {
+            throw new IOException("Файл данных и CSV-журнал должны быть разными файлами.");
+        }
+    }
+
+    private boolean isSameFile(File source, File target) throws IOException {
+        return source.getCanonicalFile().equals(target.getCanonicalFile())
+                || (source.exists() && target.exists() && Files.isSameFile(source.toPath(), target.toPath()));
+    }
+
     public void replaceFile(String sourceName, String targetName) throws IOException {
         File source = new File(sourceName);
         File target = new File(targetName);

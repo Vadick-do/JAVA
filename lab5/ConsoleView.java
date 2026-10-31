@@ -30,13 +30,22 @@ public class ConsoleView {
         System.out.println("  --interactive                Работа через меню, как в ЛР4");
         System.out.println("  --show                       Один раз вывести состояние устройств из файла");
         System.out.println("  --watch                      Периодически читать файл и выводить состояние устройств");
+        System.out.println("  --log <файл.csv>             Периодически читать файл и записывать изменения в CSV");
         System.out.println("  --replace <источник> <цель>   Заменить содержимое цели содержимым источника");
         System.out.println("Параметры:");
-        System.out.println("  --file <имя>                 Файл данных для --show, --watch или --interactive");
-        System.out.println("  --interval <секунды>         Период чтения и вывода для --watch, по умолчанию 5");
+        System.out.println("  --file <имя>                 Файл данных для --show, --watch, --log или --interactive");
+        System.out.println("  --interval <секунды>         Период для --watch и --log, по умолчанию 5");
         System.out.println("Файл по умолчанию: " + dataFileName);
         System.out.println("При --replace исходный файл сохраняется. Если цели нет, она создается.");
+        System.out.println("В CSV записывается начальное состояние, затем только изменившиеся значения.");
+        System.out.println("Столбцы CSV: time,number,property,value. Номер устройства соответствует порядку в файле.");
+        System.out.println("Время в CSV — время обнаружения изменения. Существующий журнал дополняется.");
         System.out.println("Без ключей выводится справка.");
+    }
+
+    public void showLogStart(String fileName, String csvFileName, int interval) {
+        System.out.println("\nCSV-журнал: " + csvFileName);
+        showWatchStart(fileName, interval);
     }
 
     public void showWatchStart(String fileName, int interval) {

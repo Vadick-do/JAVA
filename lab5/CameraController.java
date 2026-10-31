@@ -23,6 +23,7 @@ public class CameraController {
         String fileName = dataFileName;
         String sourceName = null;
         String targetName = null;
+        String csvFileName = null;
         boolean fileSpecified = false;
         int interval = 5;
         boolean intervalSpecified = false;
@@ -36,6 +37,7 @@ public class CameraController {
                     case "--show":
                     case "--watch":
                     case "--replace":
+                    case "--log":
                         if (action != null) {
                             throw new IllegalArgumentException("Нужно выбрать только один режим работы.");
                         }
@@ -44,6 +46,9 @@ public class CameraController {
                             sourceName = getArgument(args, i + 1, "--replace");
                             targetName = getArgument(args, i + 2, "--replace");
                             i += 2;
+                        } else if (action.equals("--log")) {
+                            csvFileName = getArgument(args, i + 1, "--log");
+                            i++;
                         }
                         break;
                     case "--file":
@@ -76,19 +81,19 @@ public class CameraController {
 
             if (action == null) {
                 if (fileSpecified) {
-                    throw new IllegalArgumentException("Для ключа --file нужно выбрать --show, --watch или --interactive.");
+                    throw new IllegalArgumentException("Для ключа --file нужно выбрать --show, --watch, --log или --interactive.");
                 }
                 if (intervalSpecified) {
-                    throw new IllegalArgumentException("Для ключа --interval нужно выбрать --watch.");
+                    throw new IllegalArgumentException("Для ключа --interval нужно выбрать --watch или --log.");
                 }
                 view.showHelp(dataFileName);
                 return 0;
             }
-            if (fileSpecified && !action.equals("--show") && !action.equals("--watch") && !action.equals("--interactive")) {
-                throw new IllegalArgumentException("Ключ --file используется только с --show, --watch или --interactive.");
+            if (fileSpecified && !action.equals("--show") && !action.equals("--watch") && !action.equals("--log") && !action.equals("--interactive")) {
+                throw new IllegalArgumentException("Ключ --file используется только с --show, --watch, --log или --interactive.");
             }
-            if (intervalSpecified && !action.equals("--watch")) {
-                throw new IllegalArgumentException("Ключ --interval используется только с --watch.");
+            if (intervalSpecified && !action.equals("--watch") && !action.equals("--log")) {
+                throw new IllegalArgumentException("Ключ --interval используется только с --watch или --log.");
             }
 
             switch (action) {
@@ -104,6 +109,9 @@ public class CameraController {
                     break;
                 case "--watch":
                     watchCamerasFromFile(fileName, interval);
+                    break;
+                case "--log":
+                    logCamerasToCsv(fileName, csvFileName, interval);
                     break;
                 case "--replace":
                     fileManager.replaceFile(sourceName, targetName);
@@ -444,6 +452,34 @@ public class CameraController {
                 Thread.sleep(interval * 1000L);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    private void logCamerasToCsv(String fileName, String csvFileName, int interval) throws IOException {
+        fileManager.checkLogFile(fileName, csvFileName);
+        try (CamerasCsvWriter csvWriter = new CamerasCsvWriter(csvFileName)) {
+            view.showLogStart(fileName, csvFileName, interval);
+            while (!Thread.currentThread().isInterrupted()) {
+                FileReadResult result = null;
+                try {
+                    fileManager.checkLogFile(fileName, csvFileName);
+                    result = fileManager.readFile(fileName);
+                } catch (IOException e) {
+                    view.showMessage("Ошибка ввода-вывода при чтении файла: " + e.getMessage());
+                }
+
+                if (result != null) {
+                    int changes = csvWriter.writeChanges(result.getCams());
+                    view.printReport(result);
+                    view.showMessage("Записано значений в CSV: " + changes);
+                }
+
+                try {
+                    Thread.sleep(interval * 1000L);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
             }
         }
     }
