@@ -1,4 +1,13 @@
-package lab5;
+package lab5.controller;
+
+import lab5.io.CamerasCsvWriter;
+import lab5.io.CamerasFileManager;
+import lab5.model.Camera;
+import lab5.model.FileReadResult;
+import lab5.model.PhotoCamera;
+import lab5.model.Smartphone;
+import lab5.model.WebCamera;
+import lab5.view.ConsoleView;
 
 import java.io.File;
 import java.io.IOException;

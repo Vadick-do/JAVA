@@ -1,5 +1,8 @@
 package lab5;
 
+import lab5.controller.CameraController;
+import lab5.view.ConsoleView;
+
 import java.util.Scanner;
 
 public class lab5 {

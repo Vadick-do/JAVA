@@ -1,4 +1,11 @@
-package lab5;
+package lab5.view;
+
+import lab5.model.Camera;
+import lab5.model.FileReadResult;
+import lab5.model.Image;
+import lab5.model.PhotoCamera;
+import lab5.model.Smartphone;
+import lab5.model.WebCamera;
 
 import java.util.ArrayList;
 import java.util.List;

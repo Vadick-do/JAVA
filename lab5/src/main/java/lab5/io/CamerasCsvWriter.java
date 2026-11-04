@@ -1,4 +1,9 @@
-package lab5;
+package lab5.io;
+
+import lab5.model.Camera;
+import lab5.model.PhotoCamera;
+import lab5.model.Smartphone;
+import lab5.model.WebCamera;
 
 import java.io.BufferedWriter;
 import java.io.Closeable;
@@ -48,7 +53,7 @@ public class CamerasCsvWriter implements Closeable {
                 }
             }
         }
-        writer.flush();
+        // writer.flush();
         previous = current;
         return changes;
     }

@@ -1,4 +1,6 @@
-package lab5;
+package lab5.io;
+
+import lab5.model.FileReadResult;
 
 import java.io.BufferedReader;
 import java.io.File;

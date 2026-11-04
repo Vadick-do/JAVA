@@ -1,4 +1,4 @@
-package lab5;
+package lab5.model;
 
 public class Image {
     private String fileName;

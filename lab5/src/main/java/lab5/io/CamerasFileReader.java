@@ -1,4 +1,10 @@
-package lab5;
+package lab5.io;
+
+import lab5.model.Camera;
+import lab5.model.FileReadResult;
+import lab5.model.PhotoCamera;
+import lab5.model.Smartphone;
+import lab5.model.WebCamera;
 
 import java.io.BufferedReader;
 import java.io.IOException;
