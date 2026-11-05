@@ -1,0 +1,12 @@
+lab6/io/CamerasCsvWriter.class
+lab6/controller/CameraController.class
+lab6/model/Smartphone.class
+lab6/lab6.class
+lab6/view/ConsoleView.class
+lab6/io/CamerasFileManager.class
+lab6/model/WebCamera.class
+lab6/model/Camera.class
+lab6/model/FileReadResult.class
+lab6/io/CamerasFileReader.class
+lab6/model/Image.class
+lab6/model/PhotoCamera.class
