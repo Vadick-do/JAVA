@@ -7,15 +7,16 @@ import lab6.model.FileReadResult;
 import lab6.model.PhotoCamera;
 import lab6.model.Smartphone;
 import lab6.model.WebCamera;
+import lab6.view.CommandLineOptions;
 import lab6.view.ConsoleView;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.NoSuchElementException;
 
 public class CameraController {
-    private final ArrayList<Camera> cams;
+    private final List<Camera> cams;
     private final ConsoleView view;
     private final CamerasFileManager fileManager;
     private String dataFileName;
@@ -24,107 +25,32 @@ public class CameraController {
         this.view = view;
         this.cams = new ArrayList<>();
         this.fileManager = new CamerasFileManager();
-        this.dataFileName = new File("lab6/devices.txt").exists() ? "lab6/devices.txt" : "devices.txt";
+        this.dataFileName = fileManager.getDefaultFileName();
     }
 
     public int run(String[] args) {
-        String action = null;
-        String fileName = dataFileName;
-        String sourceName = null;
-        String targetName = null;
-        String csvFileName = null;
-        boolean fileSpecified = false;
-        int interval = 5;
-        boolean intervalSpecified = false;
-
         try {
-            for (int i = 0; i < args.length; i++) {
-                switch (args[i]) {
-                    case "--help":
-                    case "-h":
-                    case "--interactive":
-                    case "--show":
-                    case "--watch":
-                    case "--replace":
-                    case "--log":
-                        if (action != null) {
-                            throw new IllegalArgumentException("Нужно выбрать только один режим работы.");
-                        }
-                        action = args[i].equals("-h") ? "--help" : args[i];
-                        if (action.equals("--replace")) {
-                            sourceName = getArgument(args, i + 1, "--replace");
-                            targetName = getArgument(args, i + 2, "--replace");
-                            i += 2;
-                        } else if (action.equals("--log")) {
-                            csvFileName = getArgument(args, i + 1, "--log");
-                            i++;
-                        }
-                        break;
-                    case "--file":
-                        if (fileSpecified) {
-                            throw new IllegalArgumentException("Имя файла можно указать только один раз.");
-                        }
-                        fileName = getArgument(args, i + 1, "--file");
-                        fileSpecified = true;
-                        i++;
-                        break;
-                    case "--interval":
-                        if (intervalSpecified) {
-                            throw new IllegalArgumentException("Интервал можно указать только один раз.");
-                        }
-                        try {
-                            interval = Integer.parseInt(getArgument(args, i + 1, "--interval"));
-                        } catch (NumberFormatException e) {
-                            throw new IllegalArgumentException("Интервал должен быть целым числом секунд от 1 до " + Integer.MAX_VALUE + ".");
-                        }
-                        if (interval <= 0) {
-                            throw new IllegalArgumentException("Интервал должен быть больше 0 секунд.");
-                        }
-                        intervalSpecified = true;
-                        i++;
-                        break;
-                    default:
-                        throw new IllegalArgumentException("Неизвестный ключ: " + args[i]);
-                }
-            }
-
-            if (action == null) {
-                if (fileSpecified) {
-                    throw new IllegalArgumentException("Для ключа --file нужно выбрать --show, --watch, --log или --interactive.");
-                }
-                if (intervalSpecified) {
-                    throw new IllegalArgumentException("Для ключа --interval нужно выбрать --watch или --log.");
-                }
-                view.showHelp(dataFileName);
-                return 0;
-            }
-            if (fileSpecified && !action.equals("--show") && !action.equals("--watch") && !action.equals("--log") && !action.equals("--interactive")) {
-                throw new IllegalArgumentException("Ключ --file используется только с --show, --watch, --log или --interactive.");
-            }
-            if (intervalSpecified && !action.equals("--watch") && !action.equals("--log")) {
-                throw new IllegalArgumentException("Ключ --interval используется только с --watch или --log.");
-            }
-
-            switch (action) {
-                case "--help":
+            CommandLineOptions options = view.readArguments(args, dataFileName);
+            switch (options.getAction()) {
+                case CommandLineOptions.HELP:
                     view.showHelp(dataFileName);
                     break;
-                case "--interactive":
-                    dataFileName = fileName;
+                case CommandLineOptions.INTERACTIVE:
+                    dataFileName = options.getFileName();
                     runInteractive();
                     break;
-                case "--show":
-                    showCamerasFromFile(fileName);
+                case CommandLineOptions.SHOW:
+                    showCamerasFromFile(options.getFileName());
                     break;
-                case "--watch":
-                    watchCamerasFromFile(fileName, interval);
+                case CommandLineOptions.WATCH:
+                    watchCamerasFromFile(options.getFileName(), options.getInterval());
                     break;
-                case "--log":
-                    logCamerasToCsv(fileName, csvFileName, interval);
+                case CommandLineOptions.LOG:
+                    logCamerasToCsv(options.getFileName(), options.getCsvFileName(), options.getInterval());
                     break;
-                case "--replace":
-                    fileManager.replaceFile(sourceName, targetName);
-                    view.showMessage("Файл '" + targetName + "' заменен содержимым файла '" + sourceName + "'.");
+                case CommandLineOptions.REPLACE:
+                    fileManager.replaceFile(options.getSourceName(), options.getTargetName());
+                    view.showMessage("Файл '" + options.getTargetName() + "' заменен содержимым файла '" + options.getSourceName() + "'.");
                     break;
             }
             return 0;
@@ -138,17 +64,10 @@ public class CameraController {
         }
     }
 
-    private String getArgument(String[] args, int index, String key) {
-        if (index >= args.length || args[index].isBlank() || args[index].startsWith("--") || args[index].equals("-h")) {
-            throw new IllegalArgumentException("Не указано значение для ключа " + key + ".");
-        }
-        return args[index];
-    }
-
     private void runInteractive() {
         cams.add(new WebCamera("Logitech C270", 1280.0, 30.0));
         cams.add(new PhotoCamera("Canon EOS R6", 400, 90, false, 2.0));
-        cams.add(new Smartphone("IPhone 15 Pro", 48.0, 5120.0, false, 1.0));
+        cams.add(new Smartphone("IPhone 15 Pro", 48.0, 5120.0, false, Camera.DEFAULT_ZOOM));
 
         try {
             runMenu();
@@ -199,39 +118,29 @@ public class CameraController {
     }
 
     public void addCamera() {
-        view.showMessage("\nВыберите тип создаваемого устройства:");
-        view.showMessage("1. Веб-камера");
-        view.showMessage("2. Фотокамера (зеркалка)");
-        view.showMessage("3. Смартфон");
-        view.showPrompt("Ваш выбор: ");
-        String typeChoice = view.readLine();
-
-        if (!typeChoice.equals("1") && !typeChoice.equals("2") && !typeChoice.equals("3")) {
-            view.showMessage("Неверный тип устройства!");
-            return;
-        }
+        int typeChoice = view.readCameraType();
 
         String model = view.readString("Введите название модели: ");
 
         switch (typeChoice) {
-            case "1":
-                double width = view.readDouble("Введите ширину разрешения (320 - 3840): ", 320, 3840);
-                double fps = view.readDouble("Введите FPS (1 - 120): ", 1, 120);
+            case 1:
+                double width = view.readDouble("Введите ширину разрешения (320 - 3840): ", WebCamera.MIN_WIDTH, WebCamera.MAX_WIDTH);
+                double fps = view.readDouble("Введите FPS (1 - 120): ", WebCamera.MIN_FPS, WebCamera.MAX_FPS);
                 cams.add(new WebCamera(model, width, fps));
                 view.showMessage("Веб-камера успешно добавлена!");
                 break;
 
-            case "2":
-                int iso = view.readInt("Введите ISO (100 - 6400): ", 100, 6400);
-                int battery = view.readInt("Введите заряд батареи % (0 - 100): ", 0, 100);
-                cams.add(new PhotoCamera(model, iso, battery, false, 1.0));
+            case 2:
+                int iso = view.readInt("Введите ISO (100 - 6400): ", PhotoCamera.MIN_ISO, PhotoCamera.MAX_ISO);
+                int battery = view.readInt("Введите заряд батареи % (0 - 100): ", PhotoCamera.MIN_BATTERY, PhotoCamera.MAX_BATTERY);
+                cams.add(new PhotoCamera(model, iso, battery, false, Camera.DEFAULT_ZOOM));
                 view.showMessage("Зеркалка успешно добавлена!");
                 break;
 
-            case "3":
-                double mp = view.readDouble("Введите мегапиксели (2 - 200): ", 2, 200);
-                double storage = view.readDouble("Введите объем свободной памяти МБ (от 0, можно дробное): ", 0, 1_000_000);
-                cams.add(new Smartphone(model, mp, storage, false, 1.0));
+            case 3:
+                double mp = view.readDouble("Введите мегапиксели (2 - 200): ", Smartphone.MIN_MEGAPIXELS, Smartphone.MAX_MEGAPIXELS);
+                double storage = view.readDouble("Введите объем свободной памяти МБ (от 0, можно дробное): ", 0, Double.MAX_VALUE);
+                cams.add(new Smartphone(model, mp, storage, false, Camera.DEFAULT_ZOOM));
                 view.showMessage("Смартфон успешно добавлен!");
                 break;
         }
@@ -243,37 +152,23 @@ public class CameraController {
             return;
         }
 
-        view.printCameras(cams);
-        view.showPrompt("\nВведите номер устройства для редактирования: ");
-        String indexStr = view.readLine();
-        int index;
-        try {
-            index = Integer.parseInt(indexStr) - 1;
-        } catch (NumberFormatException e) {
-            view.showMessage("Некорректный ввод!");
-            return;
-        }
-
-        if (index < 0 || index >= cams.size()) {
-            view.showMessage("Устройства с таким номером нет!");
-            return;
-        }
+        int index = view.readCameraIndex(cams, "\nВведите номер устройства для редактирования: ");
 
         Camera cam = cams.get(index);
         view.showMessage("(Нажмите Enter без ввода, чтобы оставить текущее значение)");
 
         if (cam instanceof WebCamera wc) {
             wc.setModel(view.readString("Новая модель [" + wc.getModel() + "]: ", wc.getModel()));
-            wc.setWidth(view.readDouble("Новая ширина (320 - 3840) [" + wc.getWidth() + "]: ", 320, 3840, wc.getWidth()));
-            wc.setFPS(view.readDouble("Новый FPS (1 - 120) [" + wc.getFPS() + "]: ", 1, 120, wc.getFPS()));
+            wc.setWidth(view.readDouble("Новая ширина (320 - 3840) [" + wc.getWidth() + "]: ", WebCamera.MIN_WIDTH, WebCamera.MAX_WIDTH, wc.getWidth()));
+            wc.setFPS(view.readDouble("Новый FPS (1 - 120) [" + wc.getFPS() + "]: ", WebCamera.MIN_FPS, WebCamera.MAX_FPS, wc.getFPS()));
         } else if (cam instanceof PhotoCamera pc) {
             pc.setModel(view.readString("Новая модель [" + pc.getModel() + "]: ", pc.getModel()));
-            pc.setIso(view.readInt("Новое ISO (100 - 6400) [" + pc.getIso() + "]: ", 100, 6400, pc.getIso()));
-            pc.setBattery(view.readInt("Новый заряд батареи % (0 - 100) [" + pc.getBattery() + "]: ", 0, 100, pc.getBattery()));
+            pc.setIso(view.readInt("Новое ISO (100 - 6400) [" + pc.getIso() + "]: ", PhotoCamera.MIN_ISO, PhotoCamera.MAX_ISO, pc.getIso()));
+            pc.setBattery(view.readInt("Новый заряд батареи % (0 - 100) [" + pc.getBattery() + "]: ", PhotoCamera.MIN_BATTERY, PhotoCamera.MAX_BATTERY, pc.getBattery()));
         } else if (cam instanceof Smartphone sp) {
             sp.setModel(view.readString("Новая модель [" + sp.getModel() + "]: ", sp.getModel()));
-            sp.setMegapixels(view.readDouble("Новые Мп (2 - 200) [" + sp.getMegapixels() + "]: ", 2, 200, sp.getMegapixels()));
-            sp.setStorage(view.readDouble("Новая память МБ [" + sp.getStorage() + "]: ", 0, 1_000_000, sp.getStorage()));
+            sp.setMegapixels(view.readDouble("Новые Мп (2 - 200) [" + sp.getMegapixels() + "]: ", Smartphone.MIN_MEGAPIXELS, Smartphone.MAX_MEGAPIXELS, sp.getMegapixels()));
+            sp.setStorage(view.readDouble("Новая память МБ [" + sp.getStorage() + "]: ", 0, Double.MAX_VALUE, sp.getStorage()));
         }
         view.showMessage("Параметры успешно обновлены!");
     }
@@ -284,23 +179,9 @@ public class CameraController {
             return;
         }
 
-        view.printCameras(cams);
-        view.showPrompt("\nВведите номер устройства для удаления: ");
-        String indexStr = view.readLine();
-        int index;
-        try {
-            index = Integer.parseInt(indexStr) - 1;
-        } catch (NumberFormatException e) {
-            view.showMessage("Некорректный ввод!");
-            return;
-        }
-
-        if (index >= 0 && index < cams.size()) {
-            cams.remove(index);
-            view.showMessage("Устройство успешно удалено!");
-        } else {
-            view.showMessage("Устройства с таким номером нет!");
-        }
+        int index = view.readCameraIndex(cams, "\nВведите номер устройства для удаления: ");
+        cams.remove(index);
+        view.showMessage("Устройство успешно удалено!");
     }
 
     public void workWithCamera() {
@@ -309,21 +190,7 @@ public class CameraController {
             return;
         }
 
-        view.printCameras(cams);
-        view.showPrompt("\nВыберите номер устройства для работы: ");
-        String indexStr = view.readLine();
-        int index;
-        try {
-            index = Integer.parseInt(indexStr) - 1;
-        } catch (NumberFormatException e) {
-            view.showMessage("Некорректный номер!");
-            return;
-        }
-
-        if (index < 0 || index >= cams.size()) {
-            view.showMessage("Устройства с таким номером нет!");
-            return;
-        }
+        int index = view.readCameraIndex(cams, "\nВыберите номер устройства для работы: ");
 
         Camera cam = cams.get(index);
         boolean inDeviceMenu = true;
@@ -342,7 +209,7 @@ public class CameraController {
                         view.showPhotoTaken(cam);
                         break;
                     case "2":
-                        int sec = view.readInt("Введите длительность видео (сек): ", 1, 86400);
+                        int sec = view.readInt("Введите длительность видео (сек): ", 1, Camera.MAX_VIDEO_SECONDS);
                         cam.recordVideo(sec);
                         view.showVideoRecorded(cam, sec);
                         break;
@@ -408,7 +275,7 @@ public class CameraController {
 
         view.showMessage("\nСинхронная съемка со всех устройств:");
         for (Camera cam : cams) {
-            if (!"фото".equalsIgnoreCase(cam.getMode())) {
+            if (!Camera.PHOTO_MODE.equals(cam.getMode())) {
                 cam.switchMode();
                 view.showModeChanged(cam);
             }

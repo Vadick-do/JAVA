@@ -1,5 +1,7 @@
 package lab6.model;
 
+import java.util.Locale;
+
 public class Image {
     private String fileName;
     private String resolution;
@@ -30,13 +32,13 @@ public class Image {
         if (!Double.isFinite(sizeMb) || sizeMb <= 0) {
             this.sizeMb = 2.0;
         } else {
-            this.sizeMb = Math.round(sizeMb * 10.0) / 10.0;
+            this.sizeMb = sizeMb;
         }
 
         if (format == null || format.trim().isEmpty()) {
             this.format = extractFormatFromFileName(this.fileName);
         } else {
-            this.format = format.trim().toUpperCase();
+            this.format = format.trim().toUpperCase(Locale.ROOT);
         }
     }
 
@@ -48,7 +50,7 @@ public class Image {
         if (fileName != null && fileName.contains(".")) {
             int dotIndex = fileName.lastIndexOf('.');
             if (dotIndex < fileName.length() - 1) {
-                return fileName.substring(dotIndex + 1).toUpperCase();
+                return fileName.substring(dotIndex + 1).toUpperCase(Locale.ROOT);
             }
         }
         return "JPG";
@@ -90,7 +92,7 @@ public class Image {
         if (!Double.isFinite(sizeMb) || sizeMb <= 0) {
             throw new IllegalArgumentException("Ошибка: размер изображения должен быть больше 0 МБ!");
         }
-        this.sizeMb = Math.round(sizeMb * 10.0) / 10.0;
+        this.sizeMb = sizeMb;
         return true;
     }
 
@@ -102,12 +104,12 @@ public class Image {
         if (format == null || format.trim().isEmpty()) {
             throw new IllegalArgumentException("Ошибка: формат файла не может быть пустым!");
         }
-        this.format = format.trim().toUpperCase();
+        this.format = format.trim().toUpperCase(Locale.ROOT);
         return true;
     }
 
     public double getSizeKb() {
-        return Math.round((this.sizeMb * 1024.0) * 10.0) / 10.0;
+        return this.sizeMb * 1024.0;
     }
 
     @Override

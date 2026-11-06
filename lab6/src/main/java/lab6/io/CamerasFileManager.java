@@ -13,14 +13,13 @@ import java.nio.file.Files;
 
 public class CamerasFileManager {
 
+    public String getDefaultFileName() {
+        File file = new File("lab6/devices.txt");
+        return file.exists() ? file.getPath() : "devices.txt";
+    }
+
     public FileReadResult readFile(String fileName) throws IOException {
-        File file = new File(fileName);
-        if (!file.exists() && !file.isAbsolute()) {
-            File fallback = new File("lab6", fileName);
-            if (fallback.exists()) {
-                file = fallback;
-            }
-        }
+        File file = findDataFile(fileName);
 
         try (FileInputStream fis = new FileInputStream(file);
              InputStreamReader isr = new InputStreamReader(fis, StandardCharsets.UTF_8);
@@ -30,10 +29,22 @@ public class CamerasFileManager {
         }
     }
 
+    private File findDataFile(String fileName) {
+        File file = new File(fileName);
+        if (!file.exists() && !file.isAbsolute()) {
+            File fallback = new File("lab6", fileName);
+            if (fallback.exists()) {
+                file = fallback;
+            }
+        }
+
+        return file;
+    }
+
     public void checkLogFile(String fileName, String csvFileName) throws IOException {
-        File source = new File(fileName);
+        File source = findDataFile(fileName);
         File target = new File(csvFileName);
-        if (isSameFile(source, target) || (!source.isAbsolute() && isSameFile(new File("lab6", fileName), target))) {
+        if (isSameFile(source, target)) {
             throw new IOException("Файл данных и CSV-журнал должны быть разными файлами.");
         }
     }

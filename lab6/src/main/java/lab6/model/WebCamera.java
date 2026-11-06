@@ -3,53 +3,59 @@ package lab6.model;
 import java.util.Random;
 
 public class WebCamera extends Camera {
+    public static final String TYPE = "WebCamera";
+    public static final double MIN_WIDTH = 320.0;
+    public static final double MAX_WIDTH = 3840.0;
+    public static final double DEFAULT_WIDTH = 1280.0;
+    public static final double MIN_FPS = 1.0;
+    public static final double MAX_FPS = 120.0;
+    public static final double DEFAULT_FPS = 30.0;
+    public static final double MIN_ZOOM = 1.0;
+    public static final double MAX_ZOOM = 4.0;
+
     private double width;
     private double fps;
     private boolean microActive;
 
     public WebCamera() {
-        this("Стандартная камера", 1280.0, 30.0, true, 1.0);
+        this("Стандартная камера", DEFAULT_WIDTH, DEFAULT_FPS, true, DEFAULT_ZOOM);
     }
 
     public WebCamera(String model, double width, double fps) {
-        this(model, width, fps, true, 1.0);
+        this(model, width, fps, true, DEFAULT_ZOOM);
     }
 
     public WebCamera(String model, double width, double fps, boolean microphoneActive, double currentZoom) {
         super(model);
-        if (!Double.isFinite(width) || width < 320 || width > 3840) {
-            this.width = 1280.0;
+        if (!Double.isFinite(width) || width < MIN_WIDTH || width > MAX_WIDTH) {
+            this.width = DEFAULT_WIDTH;
         } else {
             this.width = width;
         }
-        if (!Double.isFinite(fps) || fps < 1 || fps > 120) {
-            this.fps = 30.0;
+        if (!Double.isFinite(fps) || fps < MIN_FPS || fps > MAX_FPS) {
+            this.fps = DEFAULT_FPS;
         } else {
             this.fps = fps;
         }
         this.microActive = microphoneActive;
-        if (currentZoom >= 1.0 && currentZoom <= 4.0) {
+        if (Double.isFinite(currentZoom) && currentZoom >= MIN_ZOOM && currentZoom <= MAX_ZOOM) {
             this.currentZoom = currentZoom;
         } else {
-            this.currentZoom = 1.0;
+            this.currentZoom = DEFAULT_ZOOM;
         }
     }
 
     @Override
     public double getMinZoom() {
-        return 1.0;
+        return MIN_ZOOM;
     }
 
     @Override
     public double getMaxZoom() {
-        return 4.0;
+        return MAX_ZOOM;
     }
 
     public double getWidth() {
-        return width;
-    }
-
-    public double getWigth() {
         return width;
     }
 
@@ -62,7 +68,7 @@ public class WebCamera extends Camera {
     }
 
     public boolean setWidth(double width) {
-        if (!Double.isFinite(width) || width < 320.0 || width > 3840.0) {
+        if (!Double.isFinite(width) || width < MIN_WIDTH || width > MAX_WIDTH) {
             throw new IllegalArgumentException("Ошибка: ширина экрана должна быть в диапазоне от 320 до 3840 пикселей!");
         }
         this.width = width;
@@ -70,7 +76,7 @@ public class WebCamera extends Camera {
     }
 
     public boolean setFPS(double fps) {
-        if (!Double.isFinite(fps) || fps < 1.0 || fps > 120.0) {
+        if (!Double.isFinite(fps) || fps < MIN_FPS || fps > MAX_FPS) {
             throw new IllegalArgumentException("Ошибка: FPS должен быть в диапазоне от 1 до 120!");
         }
         this.fps = fps;
@@ -88,7 +94,7 @@ public class WebCamera extends Camera {
 
     @Override
     public void takePhoto() {
-        if (!"фото".equalsIgnoreCase(getMode())) {
+        if (!PHOTO_MODE.equals(getMode())) {
             throw new IllegalStateException("Ошибка съемки: веб-камера сейчас в режиме видео!");
         }
         String fileName = "webcam_snap_" + (getImages().size() + 1) + ".png";
@@ -99,12 +105,10 @@ public class WebCamera extends Camera {
 
     @Override
     public void recordVideo(int seconds) {
-        if (!"видео".equalsIgnoreCase(getMode())) {
+        if (!VIDEO_MODE.equals(getMode())) {
             throw new IllegalStateException("Ошибка записи: веб-камера сейчас в режиме фото!");
         }
-        if (seconds <= 0) {
-            throw new IllegalStateException("Ошибка: длительность записи видео должна быть больше 0 секунд!");
-        }
+        checkVideoDuration(seconds);
     }
 
     @Override

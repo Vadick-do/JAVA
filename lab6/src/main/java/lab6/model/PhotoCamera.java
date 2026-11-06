@@ -3,32 +3,42 @@ package lab6.model;
 import java.util.Random;
 
 public class PhotoCamera extends Camera {
+    public static final String TYPE = "PhotoCamera";
+    public static final int MIN_ISO = 100;
+    public static final int MAX_ISO = 6400;
+    public static final int MIN_BATTERY = 0;
+    public static final int MAX_BATTERY = 100;
+    public static final double MIN_ZOOM = 1.0;
+    public static final double MAX_ZOOM = 10.0;
+    private static final int PHOTO_BATTERY_COST = 1;
+    private static final int VIDEO_BATTERY_COST = 5;
+
     private int iso;
     private int battery;
     private boolean flashActive;
 
     public PhotoCamera() {
-        this("Sony ZV-1", 100, 100, false, 1.0);
+        this("Sony ZV-1", MIN_ISO, MAX_BATTERY, false, DEFAULT_ZOOM);
     }
 
     public PhotoCamera(String model, int iso, int battery, boolean flashActive, double currentZoom) {
         super(model);
-        if (iso < 100 || iso > 6400) {
-            this.iso = 100;
+        if (iso < MIN_ISO || iso > MAX_ISO) {
+            this.iso = MIN_ISO;
         } else {
             this.iso = iso;
         }
 
-        if (battery < 0 || battery > 100) {
-            this.battery = 100;
+        if (battery < MIN_BATTERY || battery > MAX_BATTERY) {
+            this.battery = MAX_BATTERY;
         } else {
             this.battery = battery;
         }
 
         this.flashActive = flashActive;
 
-        if (!Double.isFinite(currentZoom) || currentZoom < 1.0 || currentZoom > 10.0) {
-            this.currentZoom = 1.0;
+        if (!Double.isFinite(currentZoom) || currentZoom < MIN_ZOOM || currentZoom > MAX_ZOOM) {
+            this.currentZoom = DEFAULT_ZOOM;
         } else {
             this.currentZoom = currentZoom;
         }
@@ -36,28 +46,28 @@ public class PhotoCamera extends Camera {
 
     @Override
     public double getMinZoom() {
-        return 1.0;
+        return MIN_ZOOM;
     }
 
     @Override
     public double getMaxZoom() {
-        return 10.0;
+        return MAX_ZOOM;
     }
 
     public void recharge() {
-        this.battery = 100;
+        this.battery = MAX_BATTERY;
     }
 
     @Override
     public void takePhoto() {
-        if (!"фото".equalsIgnoreCase(getMode())) {
+        if (!PHOTO_MODE.equals(getMode())) {
             throw new IllegalStateException("Ошибка съемки: зеркалка находится в режиме видео!");
         }
-        if (battery < 5) {
+        if (battery < PHOTO_BATTERY_COST) {
             throw new IllegalStateException("Ошибка: батарея зеркалки разряжена для съемки!");
         }
 
-        battery -= 1;
+        battery -= PHOTO_BATTERY_COST;
         String fileName = "photo_raw_" + (getImages().size() + 1) + ".cr3";
         Image photo = new Image(fileName, "6000x4000", 25.0, "CR3");
         addImage(photo);
@@ -65,17 +75,15 @@ public class PhotoCamera extends Camera {
 
     @Override
     public void recordVideo(int seconds) {
-        if (!"видео".equalsIgnoreCase(getMode())) {
+        if (!VIDEO_MODE.equals(getMode())) {
             throw new IllegalStateException("Ошибка записи: зеркалка находится в режиме фото!");
         }
-        if (seconds <= 0) {
-            throw new IllegalStateException("Ошибка: длительность записи должна быть больше 0 сек!");
-        }
-        if (battery < 10) {
+        checkVideoDuration(seconds);
+        if (battery < VIDEO_BATTERY_COST) {
             throw new IllegalStateException("Ошибка: недостаточно заряда для записи видео!");
         }
 
-        battery -= 5;
+        battery -= VIDEO_BATTERY_COST;
     }
 
     @Override
@@ -89,7 +97,7 @@ public class PhotoCamera extends Camera {
 
     public void randomizeIso() {
         Random random = new Random();
-        int randomVal = (random.nextInt(64) + 1) * 100;
+        int randomVal = (random.nextInt(MAX_ISO / MIN_ISO) + 1) * MIN_ISO;
         this.iso = randomVal;
     }
 
@@ -102,7 +110,7 @@ public class PhotoCamera extends Camera {
     }
 
     public boolean setIso(int iso) {
-        if (iso < 100 || iso > 6400) {
+        if (iso < MIN_ISO || iso > MAX_ISO) {
             throw new IllegalArgumentException("Ошибка: ISO должно быть от 100 до 6400!");
         }
         this.iso = iso;
@@ -114,7 +122,7 @@ public class PhotoCamera extends Camera {
     }
 
     public boolean setBattery(int battery) {
-        if (battery < 0 || battery > 100) {
+        if (battery < MIN_BATTERY || battery > MAX_BATTERY) {
             throw new IllegalArgumentException("Ошибка: уровень заряда должен быть от 0 до 100%!");
         }
         this.battery = battery;

@@ -4,6 +4,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 public abstract class Camera {
+    public static final String PHOTO_MODE = "фото";
+    public static final String VIDEO_MODE = "видео";
+    public static final int MAX_VIDEO_SECONDS = 86400;
+    public static final double DEFAULT_ZOOM = 1.0;
+
     private static int nextId = 1;
     private final int id;
     protected String model;
@@ -18,22 +23,26 @@ public abstract class Camera {
     public Camera(String model) {
         this.id = nextId++;
         this.model = model == null || model.trim().isEmpty() ? "Камера" : model.trim();
-        this.mode = "фото";
+        this.mode = PHOTO_MODE;
         this.images = new ArrayList<>();
-        this.currentZoom = 1.0;
+        this.currentZoom = DEFAULT_ZOOM;
     }
 
     public void switchMode() {
-        if ("фото".equalsIgnoreCase(this.mode)) {
-            this.mode = "видео";
+        if (PHOTO_MODE.equals(this.mode)) {
+            this.mode = VIDEO_MODE;
         } else {
-            this.mode = "фото";
+            this.mode = PHOTO_MODE;
         }
     }
 
     public boolean setMode(String mode) {
-        if (mode != null && ("фото".equalsIgnoreCase(mode) || "видео".equalsIgnoreCase(mode))) {
-            this.mode = mode.toLowerCase();
+        if (PHOTO_MODE.equalsIgnoreCase(mode)) {
+            this.mode = PHOTO_MODE;
+            return true;
+        }
+        if (VIDEO_MODE.equalsIgnoreCase(mode)) {
+            this.mode = VIDEO_MODE;
             return true;
         }
         throw new IllegalArgumentException("Ошибка: допустимы только режимы 'фото' или 'видео'!");
@@ -42,6 +51,12 @@ public abstract class Camera {
     public abstract void takePhoto();
     public abstract void recordVideo(int seconds);
     public abstract void zoom(double factor);
+
+    protected void checkVideoDuration(int seconds) {
+        if (seconds <= 0 || seconds > MAX_VIDEO_SECONDS) {
+            throw new IllegalArgumentException("Ошибка: длительность записи должна быть от 1 до " + MAX_VIDEO_SECONDS + " сек!");
+        }
+    }
 
     public abstract double getMinZoom();
     public abstract double getMaxZoom();

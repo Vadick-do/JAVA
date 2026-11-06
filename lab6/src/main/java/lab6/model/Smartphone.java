@@ -3,31 +3,41 @@ package lab6.model;
 import java.util.Random;
 
 public class Smartphone extends Camera {
+    public static final String TYPE = "Smartphone";
+    public static final double MIN_MEGAPIXELS = 2.0;
+    public static final double MAX_MEGAPIXELS = 200.0;
+    public static final double DEFAULT_MEGAPIXELS = 48.0;
+    public static final double DEFAULT_STORAGE = 8192.0;
+    public static final double MIN_ZOOM = 0.5;
+    public static final double MAX_ZOOM = 50.0;
+    private static final double PHOTO_SIZE_MB = 5.0;
+    private static final int VIDEO_MB_PER_SECOND = 4;
+
     private double megapixels;
     private double storage;
     private boolean nightMode;
 
     public Smartphone() {
-        this("Iphone 11", 48.0, 8192.0, false, 1.0);
+        this("Iphone 11", DEFAULT_MEGAPIXELS, DEFAULT_STORAGE, false, DEFAULT_ZOOM);
     }
 
     public Smartphone(String model, double megapixels, double storage, boolean nightMode, double currentZoom) {
         super(model);
-        if (!Double.isFinite(megapixels) || megapixels < 2.0 || megapixels > 200.0) {
-            this.megapixels = 48;
+        if (!Double.isFinite(megapixels) || megapixels < MIN_MEGAPIXELS || megapixels > MAX_MEGAPIXELS) {
+            this.megapixels = DEFAULT_MEGAPIXELS;
         } else {
             this.megapixels = megapixels;
         }
 
         if (!Double.isFinite(storage) || storage < 0) {
-            this.storage = 8192.0;
+            this.storage = DEFAULT_STORAGE;
         } else {
             this.storage = storage;
         }
 
         this.nightMode = nightMode;
-        if (!Double.isFinite(currentZoom) || currentZoom < 0.5 || currentZoom > 50.0) {
-            this.currentZoom = 1.0;
+        if (!Double.isFinite(currentZoom) || currentZoom < MIN_ZOOM || currentZoom > MAX_ZOOM) {
+            this.currentZoom = DEFAULT_ZOOM;
         } else {
             this.currentZoom = currentZoom;
         }
@@ -35,51 +45,46 @@ public class Smartphone extends Camera {
 
     @Override
     public double getMinZoom() {
-        return 0.5;
+        return MIN_ZOOM;
     }
 
     @Override
     public double getMaxZoom() {
-        return 50.0;
+        return MAX_ZOOM;
     }
 
     public void clearStorage() {
-        this.storage = 8192.0;
+        this.storage = DEFAULT_STORAGE;
     }
 
     @Override
     public void takePhoto() {
-        if (!"фото".equalsIgnoreCase(getMode())) {
+        if (!PHOTO_MODE.equals(getMode())) {
             throw new IllegalStateException("Ошибка съемки: камера смартфона сейчас в режиме видео!");
         }
-        if (!Double.isFinite(storage) || storage < 10) {
+        if (!Double.isFinite(storage) || storage < PHOTO_SIZE_MB) {
             throw new IllegalStateException("Ошибка: недостаточно памяти в смартфоне для сохранения фото!");
         }
 
-        storage = Math.round((storage - 5.0) * 10.0) / 10.0;
+        storage -= PHOTO_SIZE_MB;
         String fileName = "phone_photo_" + (getImages().size() + 1) + ".jpg";
-        Image image = new Image(fileName, megapixels + " Мп", 5.0, "JPG");
+        Image image = new Image(fileName, megapixels + " Мп", PHOTO_SIZE_MB, "JPG");
         addImage(image);
     }
 
     @Override
     public void recordVideo(int seconds) {
-        if (!"видео".equalsIgnoreCase(getMode())) {
+        if (!VIDEO_MODE.equals(getMode())) {
             throw new IllegalStateException("Ошибка записи: камера смартфона сейчас в режиме фото!");
         }
-        if (seconds <= 0) {
-            throw new IllegalStateException("Ошибка: время видео должно быть больше 0 сек!");
-        }
-        if (seconds > 86400) {
-            throw new IllegalStateException("Ошибка: длительность записи не может превышать 86400 сек!");
-        }
+        checkVideoDuration(seconds);
 
-        long requiredMb = (long) seconds * 4;
+        long requiredMb = (long) seconds * VIDEO_MB_PER_SECOND;
         if (!Double.isFinite(storage) || storage < requiredMb) {
             throw new IllegalStateException("Ошибка: для записи " + seconds + " сек. видео требуется " + requiredMb + " МБ! Не хватает памяти.");
         }
 
-        storage = Math.round((storage - requiredMb) * 10.0) / 10.0;
+        storage -= requiredMb;
     }
 
     @Override
@@ -106,7 +111,7 @@ public class Smartphone extends Camera {
     }
 
     public boolean setMegapixels(double megapixels) {
-        if (!Double.isFinite(megapixels) || megapixels < 2 || megapixels > 200) {
+        if (!Double.isFinite(megapixels) || megapixels < MIN_MEGAPIXELS || megapixels > MAX_MEGAPIXELS) {
             throw new IllegalArgumentException("Ошибка: мегапиксели должны быть от 2 до 200!");
         }
         this.megapixels = megapixels;

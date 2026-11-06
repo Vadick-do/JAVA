@@ -30,6 +30,92 @@ public class ConsoleView {
         return scanner.nextLine().trim();
     }
 
+    public CommandLineOptions readArguments(String[] args, String dataFileName) {
+        String action = null;
+        String fileName = dataFileName;
+        String sourceName = null;
+        String targetName = null;
+        String csvFileName = null;
+        boolean fileSpecified = false;
+        int interval = CommandLineOptions.DEFAULT_INTERVAL;
+        boolean intervalSpecified = false;
+
+        for (int i = 0; i < args.length; i++) {
+            switch (args[i]) {
+                case "--help":
+                case "-h":
+                case "--interactive":
+                case "--show":
+                case "--watch":
+                case "--replace":
+                case "--log":
+                    if (action != null) {
+                        throw new IllegalArgumentException("Нужно выбрать только один режим работы.");
+                    }
+                    action = args[i].equals("-h") ? CommandLineOptions.HELP : args[i].substring(2);
+                    if (action.equals(CommandLineOptions.REPLACE)) {
+                        sourceName = getArgument(args, i + 1, "--replace");
+                        targetName = getArgument(args, i + 2, "--replace");
+                        i += 2;
+                    } else if (action.equals(CommandLineOptions.LOG)) {
+                        csvFileName = getArgument(args, i + 1, "--log");
+                        i++;
+                    }
+                    break;
+                case "--file":
+                    if (fileSpecified) {
+                        throw new IllegalArgumentException("Имя файла можно указать только один раз.");
+                    }
+                    fileName = getArgument(args, i + 1, "--file");
+                    fileSpecified = true;
+                    i++;
+                    break;
+                case "--interval":
+                    if (intervalSpecified) {
+                        throw new IllegalArgumentException("Интервал можно указать только один раз.");
+                    }
+                    try {
+                        interval = Integer.parseInt(getArgument(args, i + 1, "--interval"));
+                    } catch (NumberFormatException e) {
+                        throw new IllegalArgumentException("Интервал должен быть целым числом секунд от 1 до " + Integer.MAX_VALUE + ".");
+                    }
+                    if (interval <= 0) {
+                        throw new IllegalArgumentException("Интервал должен быть больше 0 секунд.");
+                    }
+                    intervalSpecified = true;
+                    i++;
+                    break;
+                default:
+                    throw new IllegalArgumentException("Неизвестный ключ: " + args[i]);
+            }
+        }
+
+        if (action == null) {
+            if (fileSpecified) {
+                throw new IllegalArgumentException("Для ключа --file нужно выбрать --show, --watch, --log или --interactive.");
+            }
+            if (intervalSpecified) {
+                throw new IllegalArgumentException("Для ключа --interval нужно выбрать --watch или --log.");
+            }
+            action = CommandLineOptions.HELP;
+        }
+        if (fileSpecified && !action.equals(CommandLineOptions.SHOW) && !action.equals(CommandLineOptions.WATCH) && !action.equals(CommandLineOptions.LOG) && !action.equals(CommandLineOptions.INTERACTIVE)) {
+            throw new IllegalArgumentException("Ключ --file используется только с --show, --watch, --log или --interactive.");
+        }
+        if (intervalSpecified && !action.equals(CommandLineOptions.WATCH) && !action.equals(CommandLineOptions.LOG)) {
+            throw new IllegalArgumentException("Ключ --interval используется только с --watch или --log.");
+        }
+
+        return new CommandLineOptions(action, fileName, sourceName, targetName, csvFileName, interval);
+    }
+
+    private String getArgument(String[] args, int index, String key) {
+        if (index >= args.length || args[index].isBlank() || args[index].startsWith("--") || args[index].equals("-h")) {
+            throw new IllegalArgumentException("Не указано значение для ключа " + key + ".");
+        }
+        return args[index];
+    }
+
     public void showHelp(String dataFileName) {
         System.out.println("Использование: java -jar build/lab6.jar <режим> [параметры]");
         System.out.println("Режимы работы:");
@@ -41,7 +127,7 @@ public class ConsoleView {
         System.out.println("  --replace <источник> <цель>   Заменить содержимое цели содержимым источника");
         System.out.println("Параметры:");
         System.out.println("  --file <имя>                 Файл данных для --show, --watch, --log или --interactive");
-        System.out.println("  --interval <секунды>         Период для --watch и --log, по умолчанию 5");
+        System.out.println("  --interval <секунды>         Период для --watch и --log, по умолчанию " + CommandLineOptions.DEFAULT_INTERVAL);
         System.out.println("Файл по умолчанию: " + dataFileName);
         System.out.println("При --replace исходный файл сохраняется. Если цели нет, она создается.");
         System.out.println("В CSV записывается начальное состояние, затем только изменившиеся значения.");
@@ -75,6 +161,19 @@ public class ConsoleView {
         System.out.println("8. Изменить название файла с данными");
 
         System.out.print("Выберите действие: ");
+    }
+
+    public int readCameraType() {
+        System.out.println("\nВыберите тип создаваемого устройства:");
+        System.out.println("1. Веб-камера");
+        System.out.println("2. Фотокамера (зеркалка)");
+        System.out.println("3. Смартфон");
+        return readInt("Ваш выбор: ", 1, 3);
+    }
+
+    public int readCameraIndex(List<Camera> cams, String message) {
+        printCameras(cams);
+        return readInt(message, 1, cams.size()) - 1;
     }
 
     public void showDeviceMenu(Camera cam) {

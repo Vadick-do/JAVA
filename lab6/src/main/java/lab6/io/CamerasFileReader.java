@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 public class CamerasFileReader {
@@ -47,6 +48,9 @@ public class CamerasFileReader {
         String line;
         while ((line = reader.readLine()) != null) {
             String trimmed = line.trim();
+            if (trimmed.startsWith("\uFEFF")) {
+                trimmed = trimmed.substring(1).trim();
+            }
             if (trimmed.isEmpty()) {
                 continue;
             }
@@ -60,7 +64,7 @@ public class CamerasFileReader {
 
             int colonIndex = trimmed.indexOf(":");
             if (colonIndex != -1) {
-                String key = trimmed.substring(0, colonIndex).trim().toLowerCase();
+                String key = trimmed.substring(0, colonIndex).trim().toLowerCase(Locale.ROOT);
                 String value = trimmed.substring(colonIndex + 1).trim();
 
                 if (key.equals("type")) {
@@ -96,36 +100,28 @@ public class CamerasFileReader {
     }
 
     private Camera createCamera(String type, Map<String, String> fields) {
-        String normalizedType = type.trim().toLowerCase();
+        String normalizedType = type.trim().toLowerCase(Locale.ROOT);
 
-        switch (normalizedType) {
-            case "webcamera":
-            case "веб-камера":
-            case "вебкамера":
-                return parseWebCamera(fields);
-
-            case "photocamera":
-            case "зеркалка":
-            case "фотокамера":
-                return parsePhotoCamera(fields);
-
-            case "smartphone":
-            case "смартфон":
-            case "телефон":
-                return parseSmartphone(fields);
-
-            default:
-                warnings.add("Предупреждение: неизвестный тип устройства '" + type + "', объект пропущен.");
-                return null;
+        if (WebCamera.TYPE.equalsIgnoreCase(normalizedType) || normalizedType.equals("веб-камера") || normalizedType.equals("вебкамера")) {
+            return parseWebCamera(fields);
         }
+        if (PhotoCamera.TYPE.equalsIgnoreCase(normalizedType) || normalizedType.equals("зеркалка") || normalizedType.equals("фотокамера")) {
+            return parsePhotoCamera(fields);
+        }
+        if (Smartphone.TYPE.equalsIgnoreCase(normalizedType) || normalizedType.equals("смартфон") || normalizedType.equals("телефон")) {
+            return parseSmartphone(fields);
+        }
+
+        warnings.add("Предупреждение: неизвестный тип устройства '" + type + "', объект пропущен.");
+        return null;
     }
 
     private WebCamera parseWebCamera(Map<String, String> fields) {
         String model = "Стандартная камера";
-        double width = 1280.0;
-        double fps = 30.0;
+        double width = WebCamera.DEFAULT_WIDTH;
+        double fps = WebCamera.DEFAULT_FPS;
         boolean micro = true;
-        double zoom = 1.0;
+        double zoom = Camera.DEFAULT_ZOOM;
 
         if (fields.containsKey("model") && !fields.get("model").trim().isEmpty()) {
             model = fields.get("model").trim();
@@ -137,7 +133,7 @@ public class CamerasFileReader {
         if (fields.containsKey("width")) {
             try {
                 double val = Double.parseDouble(fields.get("width").trim().replace(',', '.'));
-                if (Double.isFinite(val) && val >= 320.0 && val <= 3840.0) {
+                if (Double.isFinite(val) && val >= WebCamera.MIN_WIDTH && val <= WebCamera.MAX_WIDTH) {
                     width = val;
                     propertiesRead++;
                 } else {
@@ -155,7 +151,7 @@ public class CamerasFileReader {
         if (fields.containsKey("fps")) {
             try {
                 double val = Double.parseDouble(fields.get("fps").trim().replace(',', '.'));
-                if (Double.isFinite(val) && val >= 1.0 && val <= 120.0) {
+                if (Double.isFinite(val) && val >= WebCamera.MIN_FPS && val <= WebCamera.MAX_FPS) {
                     fps = val;
                     propertiesRead++;
                 } else {
@@ -187,7 +183,7 @@ public class CamerasFileReader {
         if (fields.containsKey("zoom")) {
             try {
                 double val = Double.parseDouble(fields.get("zoom").trim().replace(',', '.'));
-                if (Double.isFinite(val) && val >= 1.0 && val <= 4.0) {
+                if (Double.isFinite(val) && val >= WebCamera.MIN_ZOOM && val <= WebCamera.MAX_ZOOM) {
                     zoom = val;
                     propertiesRead++;
                 } else {
@@ -203,12 +199,13 @@ public class CamerasFileReader {
         }
         return new WebCamera(model, width, fps, micro, zoom);
     }
+
     private PhotoCamera parsePhotoCamera(Map<String, String> fields) {
         String model = "Sony ZV-1";
-        int iso = 100;
-        int battery = 100;
+        int iso = PhotoCamera.MIN_ISO;
+        int battery = PhotoCamera.MAX_BATTERY;
         boolean flash = false;
-        double zoom = 1.0;
+        double zoom = Camera.DEFAULT_ZOOM;
 
         if (fields.containsKey("model") && !fields.get("model").trim().isEmpty()) {
             model = fields.get("model").trim();
@@ -220,7 +217,7 @@ public class CamerasFileReader {
         if (fields.containsKey("iso")) {
             try {
                 int val = Integer.parseInt(fields.get("iso").trim());
-                if (val >= 100 && val <= 6400) {
+                if (val >= PhotoCamera.MIN_ISO && val <= PhotoCamera.MAX_ISO) {
                     iso = val;
                     propertiesRead++;
                 } else {
@@ -238,7 +235,7 @@ public class CamerasFileReader {
         if (fields.containsKey("battery")) {
             try {
                 int val = Integer.parseInt(fields.get("battery").trim());
-                if (val >= 0 && val <= 100) {
+                if (val >= PhotoCamera.MIN_BATTERY && val <= PhotoCamera.MAX_BATTERY) {
                     battery = val;
                     propertiesRead++;
                 } else {
@@ -269,7 +266,7 @@ public class CamerasFileReader {
         if (fields.containsKey("zoom")) {
             try {
                 double val = Double.parseDouble(fields.get("zoom").trim().replace(',', '.'));
-                if (Double.isFinite(val) && val >= 1.0 && val <= 10.0) {
+                if (Double.isFinite(val) && val >= PhotoCamera.MIN_ZOOM && val <= PhotoCamera.MAX_ZOOM) {
                     zoom = val;
                     propertiesRead++;
                 } else {
@@ -285,12 +282,13 @@ public class CamerasFileReader {
         }
         return new PhotoCamera(model, iso, battery, flash, zoom);
     }
+
     private Smartphone parseSmartphone(Map<String, String> fields) {
         String model = "Iphone 11";
-        double megapixels = 48.0;
-        double storage = 8192.0;
+        double megapixels = Smartphone.DEFAULT_MEGAPIXELS;
+        double storage = Smartphone.DEFAULT_STORAGE;
         boolean nightMode = false;
-        double zoom = 1.0;
+        double zoom = Camera.DEFAULT_ZOOM;
 
         if (fields.containsKey("model") && !fields.get("model").trim().isEmpty()) {
             model = fields.get("model").trim();
@@ -302,7 +300,7 @@ public class CamerasFileReader {
         if (fields.containsKey("megapixels")) {
             try {
                 double val = Double.parseDouble(fields.get("megapixels").trim().replace(',', '.'));
-                if (Double.isFinite(val) && val >= 2.0 && val <= 200.0) {
+                if (Double.isFinite(val) && val >= Smartphone.MIN_MEGAPIXELS && val <= Smartphone.MAX_MEGAPIXELS) {
                     megapixels = val;
                     propertiesRead++;
                 } else {
@@ -352,7 +350,7 @@ public class CamerasFileReader {
         if (fields.containsKey("zoom")) {
             try {
                 double val = Double.parseDouble(fields.get("zoom").trim().replace(',', '.'));
-                if (Double.isFinite(val) && val >= 0.5 && val <= 50.0) {
+                if (Double.isFinite(val) && val >= Smartphone.MIN_ZOOM && val <= Smartphone.MAX_ZOOM) {
                     zoom = val;
                     propertiesRead++;
                 } else {
@@ -373,7 +371,7 @@ public class CamerasFileReader {
         if (val == null) {
             return null;
         }
-        String s = val.trim().toLowerCase();
+        String s = val.trim().toLowerCase(Locale.ROOT);
         if (s.equals("true") || s.equals("да") || s.equals("1") || s.equals("вкл")) {
             return true;
         }

@@ -53,6 +53,7 @@ public class CamerasCsvWriter implements Closeable {
                 }
             }
         }
+        writer.flush();
         previous = current;
         return changes;
     }
@@ -64,17 +65,17 @@ public class CamerasCsvWriter implements Closeable {
         fields.put("zoom", Double.toString(cam.getCurrentZoom()));
 
         if (cam instanceof WebCamera wc) {
-            fields.put("type", "WebCamera");
+            fields.put("type", WebCamera.TYPE);
             fields.put("width", Double.toString(wc.getWidth()));
             fields.put("fps", Double.toString(wc.getFPS()));
             fields.put("microphone", Boolean.toString(wc.isMicrophoneEnabled()));
         } else if (cam instanceof PhotoCamera pc) {
-            fields.put("type", "PhotoCamera");
+            fields.put("type", PhotoCamera.TYPE);
             fields.put("iso", Integer.toString(pc.getIso()));
             fields.put("battery", Integer.toString(pc.getBattery()));
             fields.put("flash", Boolean.toString(pc.isFlashActive()));
         } else if (cam instanceof Smartphone sp) {
-            fields.put("type", "Smartphone");
+            fields.put("type", Smartphone.TYPE);
             fields.put("megapixels", Double.toString(sp.getMegapixels()));
             fields.put("storage", Double.toString(sp.getStorage()));
             fields.put("nightmode", Boolean.toString(sp.isNightMode()));

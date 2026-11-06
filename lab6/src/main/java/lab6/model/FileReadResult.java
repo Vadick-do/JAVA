@@ -11,7 +11,7 @@ public class FileReadResult {
     private final int propertiesMissing;
 
     public FileReadResult(List<Camera> cams, int objectCount, int propertiesRead, int propertiesMissing, List<String> warnings) {
-        this.cams = cams != null ? cams : new ArrayList<>();
+        this.cams = cams != null ? new ArrayList<>(cams) : new ArrayList<>();
         this.warnings = warnings != null ? new ArrayList<>(warnings) : new ArrayList<>();
         this.objectCount = objectCount;
         this.propertiesRead = propertiesRead;
