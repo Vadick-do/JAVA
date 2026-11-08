@@ -3,12 +3,16 @@ lab6/client/view/ConsoleView.class
 lab6/client/io/CamerasCsvWriter.class
 lab6/model/WebCamera.class
 lab6/model/Camera.class
+lab6/server/TcpServer.class
 lab6/server/CameraServer.class
 lab6/model/FileReadResult.class
 lab6/model/Image.class
+lab6/client/TcpClient.class
 lab6/model/Smartphone.class
 lab6/lab6.class
 lab6/client/controller/CameraController.class
 lab6/server/io/CamerasFileManager.class
+lab6/net/TcpProtocol.class
+lab6/net/NetworkSettings.class
 lab6/server/io/CamerasFileReader.class
 lab6/model/PhotoCamera.class

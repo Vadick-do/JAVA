@@ -1,3 +1,4 @@
+/Users/macbook/Desktop/универ/3курс/java/lab6/src/main/java/lab6/client/TcpClient.java
 /Users/macbook/Desktop/универ/3курс/java/lab6/src/main/java/lab6/client/controller/CameraController.java
 /Users/macbook/Desktop/универ/3курс/java/lab6/src/main/java/lab6/client/io/CamerasCsvWriter.java
 /Users/macbook/Desktop/универ/3курс/java/lab6/src/main/java/lab6/client/view/CommandLineOptions.java
@@ -9,6 +10,9 @@
 /Users/macbook/Desktop/универ/3курс/java/lab6/src/main/java/lab6/model/PhotoCamera.java
 /Users/macbook/Desktop/универ/3курс/java/lab6/src/main/java/lab6/model/Smartphone.java
 /Users/macbook/Desktop/универ/3курс/java/lab6/src/main/java/lab6/model/WebCamera.java
+/Users/macbook/Desktop/универ/3курс/java/lab6/src/main/java/lab6/net/NetworkSettings.java
+/Users/macbook/Desktop/универ/3курс/java/lab6/src/main/java/lab6/net/TcpProtocol.java
 /Users/macbook/Desktop/универ/3курс/java/lab6/src/main/java/lab6/server/CameraServer.java
+/Users/macbook/Desktop/универ/3курс/java/lab6/src/main/java/lab6/server/TcpServer.java
 /Users/macbook/Desktop/универ/3курс/java/lab6/src/main/java/lab6/server/io/CamerasFileManager.java
 /Users/macbook/Desktop/универ/3курс/java/lab6/src/main/java/lab6/server/io/CamerasFileReader.java
