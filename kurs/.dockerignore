@@ -1,0 +1,6 @@
+*
+!pom.xml
+!.mvn/
+!.mvn/maven.config
+!src/
+!src/**

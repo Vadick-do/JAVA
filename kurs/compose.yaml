@@ -1,0 +1,14 @@
+name: booking-coursework
+
+services:
+  app:
+    build:
+      context: .
+      target: runtime
+
+  test:
+    profiles: [test]
+    build:
+      context: .
+      target: build
+    command: ["mvn", "-B", "-ntp", "-o", "test"]
