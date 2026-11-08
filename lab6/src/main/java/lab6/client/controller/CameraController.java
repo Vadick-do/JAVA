@@ -1,31 +1,28 @@
-package lab6.controller;
+package lab6.client.controller;
 
-import lab6.io.CamerasCsvWriter;
-import lab6.io.CamerasFileManager;
+import lab6.client.io.CamerasCsvWriter;
+import lab6.client.view.CommandLineOptions;
+import lab6.client.view.ConsoleView;
 import lab6.model.Camera;
 import lab6.model.FileReadResult;
 import lab6.model.PhotoCamera;
 import lab6.model.Smartphone;
 import lab6.model.WebCamera;
-import lab6.view.CommandLineOptions;
-import lab6.view.ConsoleView;
+import lab6.server.CameraServer;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
 
 public class CameraController {
-    private final List<Camera> cams;
     private final ConsoleView view;
-    private final CamerasFileManager fileManager;
+    private final CameraServer server;
     private String dataFileName;
 
-    public CameraController(ConsoleView view) {
+    public CameraController(ConsoleView view, CameraServer server) {
         this.view = view;
-        this.cams = new ArrayList<>();
-        this.fileManager = new CamerasFileManager();
-        this.dataFileName = fileManager.getDefaultFileName();
+        this.server = server;
+        this.dataFileName = server.getDefaultFileName();
     }
 
     public int run(String[] args) {
@@ -49,7 +46,7 @@ public class CameraController {
                     logCamerasToCsv(options.getFileName(), options.getCsvFileName(), options.getInterval());
                     break;
                 case CommandLineOptions.REPLACE:
-                    fileManager.replaceFile(options.getSourceName(), options.getTargetName());
+                    server.replaceFile(options.getSourceName(), options.getTargetName());
                     view.showMessage("Файл '" + options.getTargetName() + "' заменен содержимым файла '" + options.getSourceName() + "'.");
                     break;
             }
@@ -65,9 +62,7 @@ public class CameraController {
     }
 
     private void runInteractive() {
-        cams.add(new WebCamera("Logitech C270", 1280.0, 30.0));
-        cams.add(new PhotoCamera("Canon EOS R6", 400, 90, false, 2.0));
-        cams.add(new Smartphone("IPhone 15 Pro", 48.0, 5120.0, false, Camera.DEFAULT_ZOOM));
+        server.addDemoCameras();
 
         try {
             runMenu();
@@ -88,7 +83,7 @@ public class CameraController {
                     isRunning = false;
                     break;
                 case "1":
-                    view.printCameras(cams);
+                    view.printCameras(server.getCameras());
                     break;
                 case "2":
                     addCamera();
@@ -126,27 +121,28 @@ public class CameraController {
             case 1:
                 double width = view.readDouble("Введите ширину разрешения (320 - 3840): ", WebCamera.MIN_WIDTH, WebCamera.MAX_WIDTH);
                 double fps = view.readDouble("Введите FPS (1 - 120): ", WebCamera.MIN_FPS, WebCamera.MAX_FPS);
-                cams.add(new WebCamera(model, width, fps));
+                server.addWebCamera(model, width, fps);
                 view.showMessage("Веб-камера успешно добавлена!");
                 break;
 
             case 2:
                 int iso = view.readInt("Введите ISO (100 - 6400): ", PhotoCamera.MIN_ISO, PhotoCamera.MAX_ISO);
                 int battery = view.readInt("Введите заряд батареи % (0 - 100): ", PhotoCamera.MIN_BATTERY, PhotoCamera.MAX_BATTERY);
-                cams.add(new PhotoCamera(model, iso, battery, false, Camera.DEFAULT_ZOOM));
+                server.addPhotoCamera(model, iso, battery);
                 view.showMessage("Зеркалка успешно добавлена!");
                 break;
 
             case 3:
                 double mp = view.readDouble("Введите мегапиксели (2 - 200): ", Smartphone.MIN_MEGAPIXELS, Smartphone.MAX_MEGAPIXELS);
                 double storage = view.readDouble("Введите объем свободной памяти МБ (от 0, можно дробное): ", 0, Double.MAX_VALUE);
-                cams.add(new Smartphone(model, mp, storage, false, Camera.DEFAULT_ZOOM));
+                server.addSmartphone(model, mp, storage);
                 view.showMessage("Смартфон успешно добавлен!");
                 break;
         }
     }
 
     public void editCamera() {
+        List<Camera> cams = server.getCameras();
         if (cams.isEmpty()) {
             view.showMessage("Список пуст.");
             return;
@@ -158,33 +154,38 @@ public class CameraController {
         view.showMessage("(Нажмите Enter без ввода, чтобы оставить текущее значение)");
 
         if (cam instanceof WebCamera wc) {
-            wc.setModel(view.readString("Новая модель [" + wc.getModel() + "]: ", wc.getModel()));
-            wc.setWidth(view.readDouble("Новая ширина (320 - 3840) [" + wc.getWidth() + "]: ", WebCamera.MIN_WIDTH, WebCamera.MAX_WIDTH, wc.getWidth()));
-            wc.setFPS(view.readDouble("Новый FPS (1 - 120) [" + wc.getFPS() + "]: ", WebCamera.MIN_FPS, WebCamera.MAX_FPS, wc.getFPS()));
+            String model = view.readString("Новая модель [" + wc.getModel() + "]: ", wc.getModel());
+            double width = view.readDouble("Новая ширина (320 - 3840) [" + wc.getWidth() + "]: ", WebCamera.MIN_WIDTH, WebCamera.MAX_WIDTH, wc.getWidth());
+            double fps = view.readDouble("Новый FPS (1 - 120) [" + wc.getFPS() + "]: ", WebCamera.MIN_FPS, WebCamera.MAX_FPS, wc.getFPS());
+            server.editWebCamera(index, model, width, fps);
         } else if (cam instanceof PhotoCamera pc) {
-            pc.setModel(view.readString("Новая модель [" + pc.getModel() + "]: ", pc.getModel()));
-            pc.setIso(view.readInt("Новое ISO (100 - 6400) [" + pc.getIso() + "]: ", PhotoCamera.MIN_ISO, PhotoCamera.MAX_ISO, pc.getIso()));
-            pc.setBattery(view.readInt("Новый заряд батареи % (0 - 100) [" + pc.getBattery() + "]: ", PhotoCamera.MIN_BATTERY, PhotoCamera.MAX_BATTERY, pc.getBattery()));
+            String model = view.readString("Новая модель [" + pc.getModel() + "]: ", pc.getModel());
+            int iso = view.readInt("Новое ISO (100 - 6400) [" + pc.getIso() + "]: ", PhotoCamera.MIN_ISO, PhotoCamera.MAX_ISO, pc.getIso());
+            int battery = view.readInt("Новый заряд батареи % (0 - 100) [" + pc.getBattery() + "]: ", PhotoCamera.MIN_BATTERY, PhotoCamera.MAX_BATTERY, pc.getBattery());
+            server.editPhotoCamera(index, model, iso, battery);
         } else if (cam instanceof Smartphone sp) {
-            sp.setModel(view.readString("Новая модель [" + sp.getModel() + "]: ", sp.getModel()));
-            sp.setMegapixels(view.readDouble("Новые Мп (2 - 200) [" + sp.getMegapixels() + "]: ", Smartphone.MIN_MEGAPIXELS, Smartphone.MAX_MEGAPIXELS, sp.getMegapixels()));
-            sp.setStorage(view.readDouble("Новая память МБ [" + sp.getStorage() + "]: ", 0, Double.MAX_VALUE, sp.getStorage()));
+            String model = view.readString("Новая модель [" + sp.getModel() + "]: ", sp.getModel());
+            double megapixels = view.readDouble("Новые Мп (2 - 200) [" + sp.getMegapixels() + "]: ", Smartphone.MIN_MEGAPIXELS, Smartphone.MAX_MEGAPIXELS, sp.getMegapixels());
+            double storage = view.readDouble("Новая память МБ [" + sp.getStorage() + "]: ", 0, Double.MAX_VALUE, sp.getStorage());
+            server.editSmartphone(index, model, megapixels, storage);
         }
         view.showMessage("Параметры успешно обновлены!");
     }
 
     public void deleteCamera() {
+        List<Camera> cams = server.getCameras();
         if (cams.isEmpty()) {
             view.showMessage("Список пуст. Удалять нечего.");
             return;
         }
 
         int index = view.readCameraIndex(cams, "\nВведите номер устройства для удаления: ");
-        cams.remove(index);
+        server.deleteCamera(index);
         view.showMessage("Устройство успешно удалено!");
     }
 
     public void workWithCamera() {
+        List<Camera> cams = server.getCameras();
         if (cams.isEmpty()) {
             view.showMessage("Список устройств пуст.");
             return;
@@ -205,58 +206,37 @@ public class CameraController {
                         inDeviceMenu = false;
                         break;
                     case "1":
-                        cam.takePhoto();
+                        server.takePhoto(index);
                         view.showPhotoTaken(cam);
                         break;
                     case "2":
                         int sec = view.readInt("Введите длительность видео (сек): ", 1, Camera.MAX_VIDEO_SECONDS);
-                        cam.recordVideo(sec);
+                        server.recordVideo(index, sec);
                         view.showVideoRecorded(cam, sec);
                         break;
                     case "3":
                         double factor = view.readDouble("Введите коэффициент зума (" + cam.getMinZoom() + " - " + cam.getMaxZoom() + "): ", cam.getMinZoom(), cam.getMaxZoom());
-                        cam.zoom(factor);
+                        server.zoom(index, factor);
                         view.showZoomChanged(cam);
                         break;
                     case "4":
-                        cam.switchMode();
+                        server.switchMode(index);
                         view.showModeChanged(cam);
                         break;
                     case "5":
-                        if (cam instanceof WebCamera wc) {
-                            wc.randomizeFps();
-                        } else if (cam instanceof PhotoCamera pc) {
-                            pc.randomizeIso();
-                        } else if (cam instanceof Smartphone sp) {
-                            sp.randomizeStorage();
-                        }
+                        server.randomizeCharacteristic(index);
                         view.showRandomCharacteristic(cam);
                         break;
                     case "6":
-                        if (cam instanceof WebCamera wc) {
-                            wc.toggleMicrophone();
-                        } else if (cam instanceof PhotoCamera pc) {
-                            pc.toggleFlash();
-                        } else if (cam instanceof Smartphone sp) {
-                            sp.toggleNightMode();
-                        }
+                        server.toggleSpecialAction(index);
                         view.showSpecialAction(cam);
                         break;
                     case "7":
                         view.printImages(cam);
                         break;
                     case "8":
-                        if (cam instanceof PhotoCamera pc) {
-                            pc.recharge();
-                            view.showDeviceReset(cam);
-                        } else if (cam instanceof Smartphone sp) {
-                            sp.clearStorage();
-                            view.showDeviceReset(cam);
-                        } else if (cam instanceof WebCamera) {
-                            view.showDeviceReset(cam);
-                        } else {
-                            view.showMessage("Неверное действие!");
-                        }
+                        server.resetCamera(index);
+                        view.showDeviceReset(cam);
                         break;
                     default:
                         view.showMessage("Неверное действие!");
@@ -268,19 +248,21 @@ public class CameraController {
     }
 
     public void captureAll() {
+        List<Camera> cams = server.getCameras();
         if (cams.isEmpty()) {
             view.showMessage("Нет подключенных устройств.");
             return;
         }
 
         view.showMessage("\nСинхронная съемка со всех устройств:");
-        for (Camera cam : cams) {
+        for (int index = 0; index < cams.size(); index++) {
+            Camera cam = cams.get(index);
             if (!Camera.PHOTO_MODE.equals(cam.getMode())) {
-                cam.switchMode();
+                server.switchMode(index);
                 view.showModeChanged(cam);
             }
             try {
-                cam.takePhoto();
+                server.takePhoto(index);
                 view.showPhotoTaken(cam);
             } catch (IllegalStateException e) {
                 view.showMessage(e.getMessage());
@@ -292,10 +274,9 @@ public class CameraController {
         view.showMessage("\nПопытка чтения данных из файла: " + fileName);
 
         try {
-            FileReadResult result = fileManager.readFile(fileName);
+            FileReadResult result = server.loadCameras(fileName);
 
             if (!result.getCams().isEmpty()) {
-                cams.addAll(result.getCams());
                 view.showMessage("Успешно добавлено устройств в программу: " + result.getCams().size());
             } else {
                 view.showMessage("Объектов для добавления не найдено.");
@@ -308,10 +289,8 @@ public class CameraController {
     }
 
     private void showCamerasFromFile(String fileName) throws IOException {
-        FileReadResult result = fileManager.readFile(fileName);
-        cams.clear();
-        cams.addAll(result.getCams());
-        view.printCameras(cams);
+        FileReadResult result = server.readCameras(fileName);
+        view.printCameras(result.getCams());
         view.printReport(result);
     }
 
@@ -333,14 +312,14 @@ public class CameraController {
     }
 
     private void logCamerasToCsv(String fileName, String csvFileName, int interval) throws IOException {
-        fileManager.checkLogFile(fileName, csvFileName);
+        server.checkLogFile(fileName, csvFileName);
         try (CamerasCsvWriter csvWriter = new CamerasCsvWriter(csvFileName)) {
             view.showLogStart(fileName, csvFileName, interval);
             while (!Thread.currentThread().isInterrupted()) {
                 FileReadResult result = null;
                 try {
-                    fileManager.checkLogFile(fileName, csvFileName);
-                    result = fileManager.readFile(fileName);
+                    server.checkLogFile(fileName, csvFileName);
+                    result = server.readCameras(fileName);
                 } catch (IOException e) {
                     view.showMessage("Ошибка ввода-вывода при чтении файла: " + e.getMessage());
                 }

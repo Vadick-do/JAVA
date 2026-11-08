@@ -1,4 +1,4 @@
-package lab6.view;
+package lab6.client.view;
 
 public class CommandLineOptions {
     public static final String HELP = "help";

@@ -1,4 +1,4 @@
-package lab6.io;
+package lab6.client.io;
 
 import lab6.model.Camera;
 import lab6.model.PhotoCamera;

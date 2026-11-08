@@ -1,4 +1,4 @@
-package lab6.view;
+package lab6.client.view;
 
 import lab6.model.Camera;
 import lab6.model.FileReadResult;
