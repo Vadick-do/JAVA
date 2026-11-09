@@ -31,7 +31,7 @@ public class ConsoleView {
     }
 
     public void showHelp(String dataFileName) {
-        System.out.println("Использование: java -jar build/lab5/lab5.jar <режим> [параметры]");
+        System.out.println("Использование: java -jar lab5/target/lab5.jar <режим> [параметры]");
         System.out.println("Режимы работы:");
         System.out.println("  --help, -h                   Показать справку");
         System.out.println("  --interactive                Работа через меню, как в ЛР4");

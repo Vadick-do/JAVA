@@ -1,1 +1,8 @@
 eth
+.DS_Store
+/.classpath
+/.project
+/.vscode/
+/build/
+/lab5/target/
+/lab6/build/

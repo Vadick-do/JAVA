@@ -93,6 +93,8 @@
                     <archive>
                         <manifest>
                             <mainClass>ru.coursework.booking.Application</mainClass>
+                            <addClasspath>true</addClasspath>
+                            <classpathPrefix>dependency/</classpathPrefix>
                         </manifest>
                     </archive>
                 </configuration>
@@ -101,6 +103,17 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
                 <version>3.11.0</version>
+                <executions>
+                    <execution>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>copy-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <includeScope>runtime</includeScope>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

@@ -1,3 +1,4 @@
 /target/
 /.maven-repository/
 /.env
+/application.properties

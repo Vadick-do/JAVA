@@ -12,8 +12,6 @@
     </properties>
 
     <build>
-        <sourceDirectory>${project.basedir}/lab5/src/main/java</sourceDirectory>
-        <directory>${project.basedir}/build/lab5</directory>
         <finalName>lab5</finalName>
         <plugins>
             <plugin>
