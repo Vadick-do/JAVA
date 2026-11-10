@@ -119,8 +119,12 @@ public class CameraServer {
 
     public FileReadResult loadCameras(String fileName) throws IOException {
         FileReadResult result = readCameras(fileName);
-        cams.addAll(result.getCams());
+        addCameras(result.getCams());
         return result;
+    }
+
+    void addCameras(List<Camera> cameras) {
+        cams.addAll(cameras);
     }
 
     public void checkLogFile(String fileName, String csvFileName) throws IOException {

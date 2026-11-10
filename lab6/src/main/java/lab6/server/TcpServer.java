@@ -11,17 +11,26 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 public class TcpServer {
     public static void main(String[] args) {
         try (ServerSocket server = new ServerSocket()) {
             server.bind(NetworkSettings.loadAddress());
+            Path dataDirectory = Files.isDirectory(Path.of("lab6")) ? Path.of("lab6") : Path.of(".");
+            CameraRequests requests = new CameraRequests(dataDirectory);
+            try {
+                requests.loadDefaultFile();
+            } catch (IOException | IllegalArgumentException e) {
+                System.err.println("Ошибка загрузки данных: " + e.getMessage());
+            }
             System.out.println("Сервер запущен: " + server.getLocalSocketAddress());
 
             while (true) {
                 Socket socket = server.accept();
                 try (socket) {
-                    handleRequest(socket);
+                    handleRequest(socket, requests);
                 } catch (EOFException e) {
                     System.err.println("Клиент отключился до конца сообщения.");
                 } catch (IOException e) {
@@ -34,12 +43,11 @@ public class TcpServer {
         }
     }
 
-    private static void handleRequest(Socket socket) throws IOException {
+    private static void handleRequest(Socket socket, CameraRequests requests) throws IOException {
         socket.setSoTimeout(TcpProtocol.TIMEOUT_MS);
         DataInputStream input = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
         DataOutputStream output = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
         String request = TcpProtocol.readMessage(input);
-        String response = TcpProtocol.PING.equals(request) ? TcpProtocol.PONG : TcpProtocol.UNKNOWN_COMMAND;
-        TcpProtocol.writeMessage(output, response);
+        TcpProtocol.writeMessage(output, requests.handle(request));
     }
 }

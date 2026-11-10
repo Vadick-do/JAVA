@@ -8,10 +8,12 @@ import java.nio.charset.StandardCharsets;
 
 public class TcpProtocol {
     public static final String PING = "PING";
-    public static final String PONG = "OK PONG";
-    public static final String UNKNOWN_COMMAND = "ERROR Неизвестная команда.";
+    public static final String OK = "OK";
+    public static final String ERROR = "ERROR ";
+    public static final String PONG = OK + " PONG";
+    public static final String UNKNOWN_COMMAND = ERROR + "Неизвестная команда.";
     public static final int TIMEOUT_MS = 5000;
-    private static final int MAX_MESSAGE_BYTES = 1024 * 1024;
+    public static final int MAX_MESSAGE_BYTES = 1024 * 1024;
 
     public static String readMessage(DataInputStream input) throws IOException {
         int length = input.readInt();

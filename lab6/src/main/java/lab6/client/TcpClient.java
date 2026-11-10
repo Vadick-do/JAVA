@@ -32,8 +32,14 @@ public class TcpClient {
     public static void main(String[] args) {
         try {
             TcpClient client = new TcpClient(NetworkSettings.loadAddress());
-            String response = client.request(TcpProtocol.PING);
-            if (!TcpProtocol.PONG.equals(response)) {
+            String request = args.length == 0 ? TcpProtocol.PING : String.join("\n", args);
+            String response = client.request(request);
+            if (response.startsWith(TcpProtocol.ERROR)) {
+                throw new IOException(response.substring(TcpProtocol.ERROR.length()));
+            }
+            boolean success = TcpProtocol.PING.equals(request) ? TcpProtocol.PONG.equals(response)
+                    : TcpProtocol.OK.equals(response) || response.startsWith(TcpProtocol.OK + "\n");
+            if (!success) {
                 throw new IOException("Неожиданный ответ сервера: " + response);
             }
             System.out.println(response);
