@@ -11,6 +11,7 @@ make test
 
 - `make build` проверяет проект Maven на JDK 21 и собирает образ приложения с JRE 21.
 - `make test` запускает unit-тесты в отдельном контейнере без PostgreSQL. Maven берёт зависимости из образа сборки.
+- `make test-integration` проверяет миграции и ограничения в отдельном проекте Compose с временной PostgreSQL. После прогона тестовый том удаляется.
 
 ## Запуск с PostgreSQL
 
@@ -30,9 +31,23 @@ make logs
 make down
 ```
 
-- `make up` запускает PostgreSQL и ждёт готовности принимать соединения. Java обращается к нему по имени `postgres` внутри сети Compose. Порт базы на хосте не публикуется.
-- `make run` собирает образ при изменении исходников, запускает Java с внешним файлом и проверяет подключение запросом `SELECT 1`. При успехе приложение выводит `Подключение к PostgreSQL проверено: SELECT 1 = 1.` и завершается.
-- `make logs` показывает журналы PostgreSQL, `make down` останавливает контейнеры с сохранением тома `booking-coursework_postgres-data`.
+- `make up` запускает PostgreSQL и контейнер `socat`. Java обращается к `postgres:5432` внутри Compose. `socat` пробрасывает порт для локального pgAdmin 4.
+- `make run` собирает образ при изменении исходников, запускает Java с внешним файлом и применяет миграции Flyway. При повторном запуске Flyway проверяет историю и применяет только новые миграции. Приложение выводит число применённых миграций и завершается.
+- `make logs` показывает журналы PostgreSQL и `socat`. `make down` останавливает контейнеры с сохранением тома `booking-coursework_postgres-data`.
+
+## Подключение из pgAdmin 4
+
+После `make up` в локальном pgAdmin 4 выберите **Register → Server**. На вкладке **General** задайте произвольное имя, на вкладке **Connection** заполните поля.
+
+| Поле | Значение по умолчанию |
+| --- | --- |
+| Host name/address | `127.0.0.1` |
+| Port | `15432` |
+| Maintenance database | `booking_coursework` |
+| Username | `booking` |
+| Password | значение `DB_PASSWORD` из `.env` |
+
+Если меняли `DB_NAME` или `DB_USER`, укажите параметры созданной базы. Если порт `15432` занят, задайте свободный `POSTGRES_HOST_PORT` в `.env`, снова выполните `make up` и укажите этот порт в pgAdmin 4. Публикация ограничена локальным интерфейсом. После `make run` таблицы `resources`, `slots`, `bookings` и `flyway_schema_history` появятся в `Schemas → public → Tables`.
 
 ## Настройки Java
 

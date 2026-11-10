@@ -1,14 +1,11 @@
 package ru.coursework.booking;
 
+import org.flywaydb.core.api.FlywayException;
 import ru.coursework.booking.core.config.AppConfig;
-import ru.coursework.booking.core.repository.postgres.ConnectionFactory;
+import ru.coursework.booking.core.repository.postgres.MigrationRunner;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
 
 public class Application {
     public static void main(String[] args) {
@@ -19,27 +16,17 @@ public class Application {
 
         try {
             AppConfig config = AppConfig.load(Path.of(args[1]), System.getenv());
-            verifyDatabase(new ConnectionFactory(config));
-            System.out.println("Подключение к PostgreSQL проверено: SELECT 1 = 1.");
+            int appliedMigrations = new MigrationRunner(config).migrate();
+            System.out.println("Схема PostgreSQL готова. Применено миграций: " + appliedMigrations + ".");
         } catch (IOException exception) {
             System.err.println("Не удалось прочитать файл конфигурации: " + args[1]);
             System.exit(1);
         } catch (IllegalArgumentException exception) {
             System.err.println("Ошибка конфигурации: " + exception.getMessage());
             System.exit(1);
-        } catch (SQLException exception) {
-            System.err.println("Ошибка PostgreSQL (SQLState " + exception.getSQLState() + ").");
+        } catch (FlywayException exception) {
+            System.err.println("Ошибка миграции PostgreSQL: " + exception.getMessage());
             System.exit(1);
-        }
-    }
-
-    private static void verifyDatabase(ConnectionFactory factory) throws SQLException {
-        try (Connection connection = factory.open();
-             Statement statement = connection.createStatement();
-             ResultSet result = statement.executeQuery("SELECT 1")) {
-            if (!result.next() || result.getInt(1) != 1) {
-                throw new SQLException("Неожиданный результат SELECT 1.");
-            }
         }
     }
 }
