@@ -14,7 +14,6 @@ import java.nio.file.StandardCopyOption;
 import java.util.List;
 
 class CameraRequests {
-    private static final String DEFAULT_FILE = "devices.txt";
     private static final int MAX_FILE_NAME_LENGTH = 255;
     private final CameraServer server = new CameraServer();
     private final Path dataDirectory;
@@ -24,7 +23,7 @@ class CameraRequests {
     }
 
     void loadDefaultFile() throws IOException {
-        server.loadCameras(sourceFile(DEFAULT_FILE).toString());
+        server.loadCameras(sourceFile(TcpProtocol.DEFAULT_FILE).toString());
     }
 
     String handle(String request) {
@@ -34,39 +33,39 @@ class CameraRequests {
                 case TcpProtocol.PING:
                     requireLength(args, 1);
                     return TcpProtocol.PONG;
-                case "LIST":
+                case TcpProtocol.LIST:
                     requireLength(args, 1);
                     return CameraResponse.cameras(server.getCameras());
-                case "GET":
+                case TcpProtocol.GET:
                     requireLength(args, 2);
                     List<Camera> cameras = server.getCameras();
                     return CameraResponse.cameras(List.of(cameras.get(cameraIndex(cameras, args[1]))));
-                case "READ":
-                case "LOAD":
-                    return readFile(args, args[0].equals("LOAD"));
-                case "REPLACE":
+                case TcpProtocol.READ:
+                case TcpProtocol.LOAD:
+                    return readFile(args, TcpProtocol.LOAD.equals(args[0]));
+                case TcpProtocol.REPLACE:
                     requireLength(args, 3);
                     replaceFile(args[1], args[2]);
                     return TcpProtocol.OK;
-                case "ADD":
+                case TcpProtocol.ADD:
                     requireLength(args, 5);
                     addCamera(args[1], args[2], args[3], args[4]);
                     return TcpProtocol.OK;
-                case "EDIT":
+                case TcpProtocol.EDIT:
                     requireLength(args, 5);
                     editCamera(args[1], args[2], args[3], args[4]);
                     return TcpProtocol.OK;
-                case "VIDEO":
-                case "ZOOM":
+                case TcpProtocol.VIDEO:
+                case TcpProtocol.ZOOM:
                     requireLength(args, 3);
                     changeCamera(args[0], args[1], args[2]);
                     return TcpProtocol.OK;
-                case "DELETE":
-                case "PHOTO":
-                case "MODE":
-                case "RANDOMIZE":
-                case "TOGGLE":
-                case "RESET":
+                case TcpProtocol.DELETE:
+                case TcpProtocol.PHOTO:
+                case TcpProtocol.MODE:
+                case TcpProtocol.RANDOMIZE:
+                case TcpProtocol.TOGGLE:
+                case TcpProtocol.RESET:
                     requireLength(args, 2);
                     changeCamera(args[0], args[1], "");
                     return TcpProtocol.OK;
@@ -84,7 +83,7 @@ class CameraRequests {
         if (args.length > 2) {
             throw new IllegalArgumentException("Неверное число аргументов.");
         }
-        String name = args.length == 1 ? DEFAULT_FILE : args[1];
+        String name = args.length == 1 ? TcpProtocol.DEFAULT_FILE : args[1];
         FileReadResult result = server.readCameras(sourceFile(name).toString());
         String response = CameraResponse.report(result);
         if (load) {
@@ -173,14 +172,14 @@ class CameraRequests {
     private void changeCamera(String command, String id, String value) {
         int index = cameraIndex(server.getCameras(), id);
         switch (command) {
-            case "DELETE" -> server.deleteCamera(index);
-            case "PHOTO" -> server.takePhoto(index);
-            case "VIDEO" -> server.recordVideo(index, Integer.parseInt(value));
-            case "ZOOM" -> server.zoom(index, Double.parseDouble(value));
-            case "MODE" -> server.switchMode(index);
-            case "RANDOMIZE" -> server.randomizeCharacteristic(index);
-            case "TOGGLE" -> server.toggleSpecialAction(index);
-            case "RESET" -> server.resetCamera(index);
+            case TcpProtocol.DELETE -> server.deleteCamera(index);
+            case TcpProtocol.PHOTO -> server.takePhoto(index);
+            case TcpProtocol.VIDEO -> server.recordVideo(index, Integer.parseInt(value));
+            case TcpProtocol.ZOOM -> server.zoom(index, Double.parseDouble(value));
+            case TcpProtocol.MODE -> server.switchMode(index);
+            case TcpProtocol.RANDOMIZE -> server.randomizeCharacteristic(index);
+            case TcpProtocol.TOGGLE -> server.toggleSpecialAction(index);
+            case TcpProtocol.RESET -> server.resetCamera(index);
         }
     }
 

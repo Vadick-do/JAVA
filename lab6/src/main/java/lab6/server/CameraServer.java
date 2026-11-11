@@ -19,12 +19,6 @@ public class CameraServer {
         return List.copyOf(cams);
     }
 
-    public void addDemoCameras() {
-        cams.add(new WebCamera("Logitech C270", 1280.0, 30.0));
-        cams.add(new PhotoCamera("Canon EOS R6", 400, 90, false, 2.0));
-        cams.add(new Smartphone("IPhone 15 Pro", 48.0, 5120.0, false, Camera.DEFAULT_ZOOM));
-    }
-
     public void addWebCamera(String model, double width, double fps) {
         cams.add(new WebCamera(model, width, fps));
     }
@@ -109,10 +103,6 @@ public class CameraServer {
         }
     }
 
-    public String getDefaultFileName() {
-        return fileManager.getDefaultFileName();
-    }
-
     public FileReadResult readCameras(String fileName) throws IOException {
         return fileManager.readFile(fileName);
     }
@@ -125,13 +115,5 @@ public class CameraServer {
 
     void addCameras(List<Camera> cameras) {
         cams.addAll(cameras);
-    }
-
-    public void checkLogFile(String fileName, String csvFileName) throws IOException {
-        fileManager.checkLogFile(fileName, csvFileName);
-    }
-
-    public void replaceFile(String sourceName, String targetName) throws IOException {
-        fileManager.replaceFile(sourceName, targetName);
     }
 }

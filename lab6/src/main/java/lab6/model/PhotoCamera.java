@@ -22,7 +22,11 @@ public class PhotoCamera extends Camera {
     }
 
     public PhotoCamera(String model, int iso, int battery, boolean flashActive, double currentZoom) {
-        super(model);
+        this(model, iso, battery, flashActive, currentZoom, 0);
+    }
+
+    public PhotoCamera(String model, int iso, int battery, boolean flashActive, double currentZoom, int id) {
+        super(model, id);
         if (iso < MIN_ISO || iso > MAX_ISO) {
             this.iso = MIN_ISO;
         } else {

@@ -12,6 +12,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -23,6 +24,19 @@ public class CamerasCsvWriter implements Closeable {
     private final BufferedWriter writer;
     private boolean headerWritten;
     private List<Map<String, String>> previous = new ArrayList<>();
+
+    public static void checkDataFile(String fileName, String csvFileName) throws IOException {
+        File data = new File(fileName);
+        File csv = new File(csvFileName);
+        if (isSameFile(data, csv) || (!data.isAbsolute() && isSameFile(new File("lab6", fileName), csv))) {
+            throw new IOException("Файл данных и CSV-журнал должны быть разными файлами.");
+        }
+    }
+
+    private static boolean isSameFile(File data, File csv) throws IOException {
+        return data.getCanonicalFile().equals(csv.getCanonicalFile())
+                || (data.exists() && csv.exists() && Files.isSameFile(data.toPath(), csv.toPath()));
+    }
 
     public CamerasCsvWriter(String fileName) throws IOException {
         File file = new File(fileName);

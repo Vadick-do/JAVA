@@ -8,6 +8,22 @@ import java.nio.charset.StandardCharsets;
 
 public class TcpProtocol {
     public static final String PING = "PING";
+    public static final String LIST = "LIST";
+    public static final String GET = "GET";
+    public static final String READ = "READ";
+    public static final String LOAD = "LOAD";
+    public static final String REPLACE = "REPLACE";
+    public static final String ADD = "ADD";
+    public static final String EDIT = "EDIT";
+    public static final String DELETE = "DELETE";
+    public static final String PHOTO = "PHOTO";
+    public static final String VIDEO = "VIDEO";
+    public static final String ZOOM = "ZOOM";
+    public static final String MODE = "MODE";
+    public static final String RANDOMIZE = "RANDOMIZE";
+    public static final String TOGGLE = "TOGGLE";
+    public static final String RESET = "RESET";
+    public static final String DEFAULT_FILE = "devices.txt";
     public static final String OK = "OK";
     public static final String ERROR = "ERROR ";
     public static final String PONG = OK + " PONG";

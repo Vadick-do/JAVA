@@ -129,6 +129,8 @@ public class ConsoleView {
         System.out.println("  --file <имя>                 Файл данных для --show, --watch, --log или --interactive");
         System.out.println("  --interval <секунды>         Период для --watch и --log, по умолчанию " + CommandLineOptions.DEFAULT_INTERVAL);
         System.out.println("Файл по умолчанию: " + dataFileName);
+        System.out.println("Файлы данных указываются по имени .txt на сервере. CSV-журнал записывается на клиенте.");
+        System.out.println("Запуск сервера: java -cp build/lab6.jar lab6.server.TcpServer");
         System.out.println("При --replace исходный файл сохраняется. Если цели нет, она создается.");
         System.out.println("В CSV записывается начальное состояние, затем только изменившиеся значения.");
         System.out.println("Столбцы CSV: time,number,property,value. Номер устройства соответствует порядку в файле.");
@@ -363,7 +365,12 @@ public class ConsoleView {
     }
 
     public void showPhotoTaken(Camera cam) {
-        Image image = cam.getImages().get(cam.getImages().size() - 1);
+        List<Image> images = cam.getImages();
+        if (images.isEmpty()) {
+            showMessage("Сервер не вернул данные о снимке.");
+            return;
+        }
+        Image image = images.get(images.size() - 1);
         if (cam instanceof WebCamera wc) {
             System.out.println("Веб-камера [" + wc.getModel() + "] сделала снимок "
                     + image.getResolution() + " (зум: " + wc.getCurrentZoom()

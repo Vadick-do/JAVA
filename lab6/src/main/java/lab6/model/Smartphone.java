@@ -22,7 +22,11 @@ public class Smartphone extends Camera {
     }
 
     public Smartphone(String model, double megapixels, double storage, boolean nightMode, double currentZoom) {
-        super(model);
+        this(model, megapixels, storage, nightMode, currentZoom, 0);
+    }
+
+    public Smartphone(String model, double megapixels, double storage, boolean nightMode, double currentZoom, int id) {
+        super(model, id);
         if (!Double.isFinite(megapixels) || megapixels < MIN_MEGAPIXELS || megapixels > MAX_MEGAPIXELS) {
             this.megapixels = DEFAULT_MEGAPIXELS;
         } else {

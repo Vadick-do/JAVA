@@ -26,7 +26,11 @@ public class WebCamera extends Camera {
     }
 
     public WebCamera(String model, double width, double fps, boolean microphoneActive, double currentZoom) {
-        super(model);
+        this(model, width, fps, microphoneActive, currentZoom, 0);
+    }
+
+    public WebCamera(String model, double width, double fps, boolean microphoneActive, double currentZoom, int id) {
+        super(model, id);
         if (!Double.isFinite(width) || width < MIN_WIDTH || width > MAX_WIDTH) {
             this.width = DEFAULT_WIDTH;
         } else {

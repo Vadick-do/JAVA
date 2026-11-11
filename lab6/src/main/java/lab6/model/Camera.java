@@ -21,7 +21,11 @@ public abstract class Camera {
     }
 
     public Camera(String model) {
-        this.id = nextId++;
+        this(model, 0);
+    }
+
+    protected Camera(String model, int id) {
+        this.id = id == 0 ? nextId++ : id;
         this.model = model == null || model.trim().isEmpty() ? "Камера" : model.trim();
         this.mode = PHOTO_MODE;
         this.images = new ArrayList<>();
