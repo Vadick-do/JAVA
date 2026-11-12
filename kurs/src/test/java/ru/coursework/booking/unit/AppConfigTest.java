@@ -37,6 +37,8 @@ class AppConfigTest {
                 config.getJdbcUrl());
         assertEquals("file-user", config.getDatabaseUser());
         assertEquals("file-password", config.getDatabasePassword());
+        assertEquals("0.0.0.0", config.getHttpHost());
+        assertEquals(8080, config.getHttpPort());
     }
 
     @Test
@@ -93,5 +95,54 @@ class AppConfigTest {
                 () -> AppConfig.load(file, Map.of("DB_HOST", "postgres/test?user=other")));
 
         assertTrue(exception.getMessage().contains("db.host"));
+    }
+
+    @Test
+    void readsHttpSettingsFromDifferentFilesWithoutRebuilding() throws IOException {
+        Path first = Files.writeString(directory.resolve("first.properties"),
+                FILE_SETTINGS + "http.host=127.0.0.1\nhttp.port=8081\n");
+        Path second = Files.writeString(directory.resolve("second.properties"),
+                FILE_SETTINGS + "http.host=0.0.0.0\nhttp.port=9090\n");
+
+        AppConfig firstConfig = AppConfig.load(first, Map.of());
+        AppConfig secondConfig = AppConfig.load(second, Map.of());
+
+        assertEquals("127.0.0.1", firstConfig.getHttpHost());
+        assertEquals(8081, firstConfig.getHttpPort());
+        assertEquals("0.0.0.0", secondConfig.getHttpHost());
+        assertEquals(9090, secondConfig.getHttpPort());
+    }
+
+    @Test
+    void environmentOverridesInvalidHttpSettingsInFile() throws IOException {
+        Path file = Files.writeString(directory.resolve("application.properties"),
+                FILE_SETTINGS + "http.host=bad/host\nhttp.port=bad\n");
+
+        AppConfig config = AppConfig.load(file, Map.of("HTTP_HOST", "127.0.0.1", "HTTP_PORT", "65535"));
+
+        assertEquals("127.0.0.1", config.getHttpHost());
+        assertEquals(65535, config.getHttpPort());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "abc", "0", "-1", "65536", "2147483648"})
+    void rejectsInvalidHttpPort(String port) throws IOException {
+        Path file = Files.writeString(directory.resolve("application.properties"), FILE_SETTINGS + "http.port=" + port);
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> AppConfig.load(file, Map.of()));
+
+        assertTrue(exception.getMessage().contains("http.port"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "http://localhost", "localhost/path", "127.0.0.1:8080", "bad host"})
+    void rejectsInvalidHttpHost(String host) throws IOException {
+        Path file = Files.writeString(directory.resolve("application.properties"), FILE_SETTINGS + "http.host=" + host);
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> AppConfig.load(file, Map.of()));
+
+        assertTrue(exception.getMessage().contains("http.host"));
     }
 }

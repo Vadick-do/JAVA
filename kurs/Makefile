@@ -22,13 +22,13 @@ test-integration:
 	done
 
 run:
-	docker compose run --rm -T --build app
+	docker compose run --rm -T --service-ports --build app
 
 up:
-	docker compose up -d --wait postgres socat
+	docker compose up -d --build --wait app socat
 
 down:
 	docker compose down
 
 logs:
-	docker compose logs postgres socat
+	docker compose logs app postgres socat
