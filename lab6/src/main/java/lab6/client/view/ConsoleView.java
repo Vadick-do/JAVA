@@ -105,6 +105,10 @@ public class ConsoleView {
         if (intervalSpecified && !action.equals(CommandLineOptions.WATCH) && !action.equals(CommandLineOptions.LOG)) {
             throw new IllegalArgumentException("Ключ --interval используется только с --watch или --log.");
         }
+        if (CommandLineOptions.LOG.equals(action)
+                && (!csvFileName.endsWith(".csv") || csvFileName.contains("/") || csvFileName.contains("\\"))) {
+            throw new IllegalArgumentException("Для --log укажите имя файла .csv на сервере без пути.");
+        }
 
         return new CommandLineOptions(action, fileName, sourceName, targetName, csvFileName, interval);
     }
@@ -129,7 +133,7 @@ public class ConsoleView {
         System.out.println("  --file <имя>                 Файл данных для --show, --watch, --log или --interactive");
         System.out.println("  --interval <секунды>         Период для --watch и --log, по умолчанию " + CommandLineOptions.DEFAULT_INTERVAL);
         System.out.println("Файл по умолчанию: " + dataFileName);
-        System.out.println("Файлы данных указываются по имени .txt на сервере. CSV-журнал записывается на клиенте.");
+        System.out.println("Файлы данных .txt и CSV-журналы указываются по имени и хранятся на сервере.");
         System.out.println("Запуск сервера: java -cp build/lab6.jar lab6.server.TcpServer");
         System.out.println("При --replace исходный файл сохраняется. Если цели нет, она создается.");
         System.out.println("В CSV записывается начальное состояние, затем только изменившиеся значения.");
@@ -139,7 +143,7 @@ public class ConsoleView {
     }
 
     public void showLogStart(String fileName, String csvFileName, int interval) {
-        System.out.println("\nCSV-журнал: " + csvFileName);
+        System.out.println("\nCSV-журнал на сервере: " + csvFileName);
         showWatchStart(fileName, interval);
     }
 

@@ -23,7 +23,7 @@ public class TcpClient {
             socket.connect(address, TcpProtocol.TIMEOUT_MS);
             socket.setSoTimeout(TcpProtocol.TIMEOUT_MS);
             DataInputStream input = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
-            DataOutputStream output = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
+            DataOutputStream output = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream(), TcpProtocol.BLOCK_BYTES));
             TcpProtocol.writeMessage(output, message);
             return TcpProtocol.readMessage(input);
         }

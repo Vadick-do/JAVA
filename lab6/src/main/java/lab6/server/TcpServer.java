@@ -29,13 +29,8 @@ public class TcpServer {
 
             while (true) {
                 Socket socket = server.accept();
-                try (socket) {
-                    handleRequest(socket, requests);
-                } catch (EOFException e) {
-                    System.err.println("Клиент отключился до конца сообщения.");
-                } catch (IOException e) {
-                    System.err.println("Ошибка обмена с клиентом: " + e.getMessage());
-                }
+                Thread worker = new Thread(() -> handleClient(socket, requests));
+                worker.start();
             }
         } catch (IOException | IllegalArgumentException e) {
             System.err.println("Ошибка сервера: " + e.getMessage());
@@ -43,10 +38,20 @@ public class TcpServer {
         }
     }
 
+    private static void handleClient(Socket socket, CameraRequests requests) {
+        try (socket) {
+            handleRequest(socket, requests);
+        } catch (EOFException e) {
+            System.err.println("Клиент отключился до конца сообщения.");
+        } catch (IOException e) {
+            System.err.println("Ошибка обмена с клиентом: " + e.getMessage());
+        }
+    }
+
     private static void handleRequest(Socket socket, CameraRequests requests) throws IOException {
         socket.setSoTimeout(TcpProtocol.TIMEOUT_MS);
         DataInputStream input = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
-        DataOutputStream output = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
+        DataOutputStream output = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream(), TcpProtocol.BLOCK_BYTES));
         String request = TcpProtocol.readMessage(input);
         TcpProtocol.writeMessage(output, requests.handle(request));
     }

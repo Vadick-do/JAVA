@@ -1,7 +1,6 @@
 package lab6.client.controller;
 
 import lab6.client.CameraClient;
-import lab6.client.io.CamerasCsvWriter;
 import lab6.client.view.CommandLineOptions;
 import lab6.client.view.ConsoleView;
 import lab6.model.Camera;
@@ -323,30 +322,20 @@ public class CameraController {
         }
     }
 
-    private void logCamerasToCsv(String fileName, String csvFileName, int interval) throws IOException {
-        CamerasCsvWriter.checkDataFile(fileName, csvFileName);
-        try (CamerasCsvWriter csvWriter = new CamerasCsvWriter(csvFileName)) {
-            view.showLogStart(fileName, csvFileName, interval);
-            while (!Thread.currentThread().isInterrupted()) {
-                FileReadResult result = null;
-                try {
-                    CamerasCsvWriter.checkDataFile(fileName, csvFileName);
-                    result = client.readCameras(fileName);
-                } catch (IOException e) {
-                    view.showMessage("Ошибка ввода-вывода при чтении файла: " + e.getMessage());
-                }
+    private void logCamerasToCsv(String fileName, String csvFileName, int interval) {
+        view.showLogStart(fileName, csvFileName, interval);
+        while (!Thread.currentThread().isInterrupted()) {
+            try {
+                int changes = client.logCameras(fileName, csvFileName);
+                view.showMessage("Записано значений в CSV: " + changes);
+            } catch (IOException e) {
+                view.showMessage("Ошибка ввода-вывода при записи журнала: " + e.getMessage());
+            }
 
-                if (result != null) {
-                    int changes = csvWriter.writeChanges(result.getCams());
-                    view.printReport(result);
-                    view.showMessage("Записано значений в CSV: " + changes);
-                }
-
-                try {
-                    Thread.sleep(interval * 1000L);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
+            try {
+                Thread.sleep(interval * 1000L);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
         }
     }

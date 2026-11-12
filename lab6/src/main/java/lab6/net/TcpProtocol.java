@@ -12,6 +12,7 @@ public class TcpProtocol {
     public static final String GET = "GET";
     public static final String READ = "READ";
     public static final String LOAD = "LOAD";
+    public static final String LOG = "LOG";
     public static final String REPLACE = "REPLACE";
     public static final String ADD = "ADD";
     public static final String EDIT = "EDIT";
@@ -30,6 +31,10 @@ public class TcpProtocol {
     public static final String UNKNOWN_COMMAND = ERROR + "Неизвестная команда.";
     public static final int TIMEOUT_MS = 5000;
     public static final int MAX_MESSAGE_BYTES = 1024 * 1024;
+    public static final int MTU_BYTES = 1500;
+    private static final int IPV4_HEADER_BYTES = 20;
+    private static final int TCP_HEADER_BYTES = 20;
+    public static final int BLOCK_BYTES = MTU_BYTES - IPV4_HEADER_BYTES - TCP_HEADER_BYTES;
 
     public static String readMessage(DataInputStream input) throws IOException {
         int length = input.readInt();
@@ -43,8 +48,15 @@ public class TcpProtocol {
         byte[] bytes = message.getBytes(StandardCharsets.UTF_8);
         checkLength(bytes.length);
         output.writeInt(bytes.length);
-        output.write(bytes);
-        output.flush();
+        int offset = 0;
+        int available = BLOCK_BYTES - Integer.BYTES;
+        while (offset < bytes.length) {
+            int count = Math.min(available, bytes.length - offset);
+            output.write(bytes, offset, count);
+            output.flush();
+            offset += count;
+            available = BLOCK_BYTES;
+        }
     }
 
     private static void checkLength(int length) throws IOException {

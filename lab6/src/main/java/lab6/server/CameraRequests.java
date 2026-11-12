@@ -6,17 +6,21 @@ import lab6.model.PhotoCamera;
 import lab6.model.Smartphone;
 import lab6.model.WebCamera;
 import lab6.net.TcpProtocol;
+import lab6.server.io.CamerasCsvWriter;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 class CameraRequests {
     private static final int MAX_FILE_NAME_LENGTH = 255;
     private final CameraServer server = new CameraServer();
     private final Path dataDirectory;
+    private final Map<Path, CamerasCsvWriter> journals = new HashMap<>();
 
     CameraRequests(Path dataDirectory) {
         this.dataDirectory = dataDirectory.toAbsolutePath().normalize();
@@ -26,7 +30,7 @@ class CameraRequests {
         server.loadCameras(sourceFile(TcpProtocol.DEFAULT_FILE).toString());
     }
 
-    String handle(String request) {
+    synchronized String handle(String request) {
         String[] args = request.split("\n", 6);
         try {
             switch (args[0]) {
@@ -47,6 +51,9 @@ class CameraRequests {
                     requireLength(args, 3);
                     replaceFile(args[1], args[2]);
                     return TcpProtocol.OK;
+                case TcpProtocol.LOG:
+                    requireLength(args, 3);
+                    return logFile(args[1], args[2]);
                 case TcpProtocol.ADD:
                     requireLength(args, 5);
                     addCamera(args[1], args[2], args[3], args[4]);
@@ -92,10 +99,10 @@ class CameraRequests {
         return response;
     }
 
-    private Path dataFile(String name) {
-        if (name.length() > MAX_FILE_NAME_LENGTH || !name.endsWith(".txt")
+    private Path dataFile(String name, String extension) {
+        if (name.length() > MAX_FILE_NAME_LENGTH || !name.endsWith(extension)
                 || name.contains("/") || name.contains("\\") || name.indexOf(0) >= 0) {
-            throw new IllegalArgumentException("Укажите имя файла .txt в папке данных сервера.");
+            throw new IllegalArgumentException("Укажите имя файла " + extension + " в папке данных сервера.");
         }
         Path file = dataDirectory.resolve(name).normalize();
         if (!dataDirectory.equals(file.getParent()) || Files.isSymbolicLink(file)) {
@@ -105,7 +112,7 @@ class CameraRequests {
     }
 
     private Path sourceFile(String name) throws IOException {
-        Path file = dataFile(name);
+        Path file = dataFile(name, ".txt");
         if (!Files.isRegularFile(file)) {
             throw new IOException("Файл данных не найден или не является файлом: " + name);
         }
@@ -114,7 +121,7 @@ class CameraRequests {
 
     private void replaceFile(String sourceName, String targetName) throws IOException {
         Path source = sourceFile(sourceName);
-        Path target = dataFile(targetName);
+        Path target = dataFile(targetName, ".txt");
         if (Files.exists(target)) {
             if (!Files.isRegularFile(target)) {
                 throw new IOException("Путь не является файлом: " + targetName);
@@ -130,6 +137,21 @@ class CameraRequests {
         } finally {
             Files.deleteIfExists(temp);
         }
+    }
+
+    private String logFile(String sourceName, String csvName) throws IOException {
+        Path source = sourceFile(sourceName);
+        Path csv = dataFile(csvName, ".csv");
+        if (Files.exists(csv) && Files.isSameFile(source, csv)) {
+            throw new IOException("Файл данных и CSV-журнал должны быть разными файлами.");
+        }
+        FileReadResult result = server.readCameras(source.toString());
+        CamerasCsvWriter journal = journals.get(csv);
+        if (journal == null) {
+            journal = new CamerasCsvWriter(csv.toString());
+            journals.put(csv, journal);
+        }
+        return TcpProtocol.OK + "\n" + journal.writeChanges(result.getCams());
     }
 
     private void addCamera(String type, String model, String first, String second) {

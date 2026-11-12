@@ -31,6 +31,21 @@ public class CameraClient {
         return CameraReply.decode(request(TcpProtocol.LOAD, fileName), true);
     }
 
+    public int logCameras(String fileName, String csvFileName) throws IOException {
+        String[] fields = request(TcpProtocol.LOG, fileName, csvFileName).split("\n", -1);
+        if (fields.length == 2 && TcpProtocol.OK.equals(fields[0])) {
+            try {
+                int changes = Integer.parseInt(fields[1]);
+                if (changes >= 0) {
+                    return changes;
+                }
+            } catch (NumberFormatException e) {
+                throw new IOException("Некорректный ответ сервера.", e);
+            }
+        }
+        throw new IOException("Некорректный ответ сервера.");
+    }
+
     public void execute(String command, Object... arguments) throws IOException {
         if (!TcpProtocol.OK.equals(request(command, arguments))) {
             throw new IOException("Некорректный ответ сервера.");
