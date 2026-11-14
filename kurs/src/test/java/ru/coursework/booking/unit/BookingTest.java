@@ -147,4 +147,36 @@ class BookingTest {
         assertSame(expired, expired.expire(now));
         assertThrows(IllegalStateException.class, () -> expired.confirm("Анна", "контакт", now));
     }
+
+    @Test
+    void rejectsTimeBeforeCreation() {
+        Instant earlier = createdAt.minusNanos(1);
+
+        assertThrows(IllegalArgumentException.class, () -> hold.getEffectiveStatus(earlier));
+        assertThrows(IllegalArgumentException.class, () -> hold.confirm("Анна", "контакт", earlier));
+        assertThrows(IllegalArgumentException.class, () -> hold.cancel(earlier));
+        assertThrows(IllegalArgumentException.class, () -> hold.expire(earlier));
+    }
+
+    @Test
+    void rejectsTimeBeforeConfirmation() {
+        Booking confirmed = hold.confirm("Анна", "контакт", createdAt.plusSeconds(60));
+        Instant earlier = createdAt.plusSeconds(30);
+
+        assertThrows(IllegalArgumentException.class, () -> confirmed.getEffectiveStatus(earlier));
+        assertThrows(IllegalArgumentException.class, () -> confirmed.confirm("Анна", "контакт", earlier));
+        assertThrows(IllegalArgumentException.class, () -> confirmed.cancel(earlier));
+        assertThrows(IllegalArgumentException.class, () -> confirmed.expire(earlier));
+    }
+
+    @Test
+    void rejectsTimeBeforeCancellation() {
+        Booking cancelled = hold.cancel(createdAt.plusSeconds(60));
+        Instant earlier = createdAt.plusSeconds(30);
+
+        assertThrows(IllegalArgumentException.class, () -> cancelled.getEffectiveStatus(earlier));
+        assertThrows(IllegalArgumentException.class, () -> cancelled.confirm("Анна", "контакт", earlier));
+        assertThrows(IllegalArgumentException.class, () -> cancelled.cancel(earlier));
+        assertThrows(IllegalArgumentException.class, () -> cancelled.expire(earlier));
+    }
 }

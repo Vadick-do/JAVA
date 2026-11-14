@@ -44,6 +44,16 @@ public final class Booking {
         if (now == null) {
             throw new IllegalArgumentException("Текущее время должно быть указано.");
         }
+        Instant lastChangedAt = createdAt;
+        if (confirmedAt != null) {
+            lastChangedAt = confirmedAt;
+        }
+        if (cancelledAt != null) {
+            lastChangedAt = cancelledAt;
+        }
+        if (now.isBefore(lastChangedAt)) {
+            throw new IllegalArgumentException("Текущее время не может быть раньше последнего изменения брони.");
+        }
         if (status == BookingStatus.HOLD && (!now.isBefore(expiresAt) || !now.isBefore(slot.getStartsAt()))) {
             return BookingStatus.EXPIRED;
         }

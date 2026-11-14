@@ -27,4 +27,3 @@ dfdsfed: sdfsdfsdfsdfs
 Type: WebCamera,
 Model: Defender Basic,
 Fps: 435;
-
