@@ -27,6 +27,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -252,6 +253,18 @@ class SlotServiceIT {
         public List<Slot> findAvailable(Connection connection, long resourceId, Instant from, Instant to) throws SQLException {
             lastConnection = connection;
             return delegate.findAvailable(connection, resourceId, from, to);
+        }
+
+        @Override
+        public Optional<Slot> findById(Connection connection, long id) throws SQLException {
+            lastConnection = connection;
+            return delegate.findById(connection, id);
+        }
+
+        @Override
+        public Optional<Slot> lockById(Connection connection, long id) throws SQLException {
+            lastConnection = connection;
+            return delegate.lockById(connection, id);
         }
     }
 }

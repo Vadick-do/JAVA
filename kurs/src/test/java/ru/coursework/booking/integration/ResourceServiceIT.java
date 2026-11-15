@@ -169,6 +169,12 @@ class ResourceServiceIT {
             return delegate.findById(connection, id);
         }
 
+        @Override
+        public Optional<Resource> lockById(Connection connection, long id) throws SQLException {
+            track(connection);
+            return delegate.lockById(connection, id);
+        }
+
         private void track(Connection connection) throws SQLException {
             lastConnection = connection;
             if (failure != null) {

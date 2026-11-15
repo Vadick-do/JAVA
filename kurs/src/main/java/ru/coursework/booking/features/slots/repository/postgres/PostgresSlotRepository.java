@@ -13,8 +13,37 @@ import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public final class PostgresSlotRepository implements SlotRepository {
+    @Override
+    public Optional<Slot> findById(Connection connection, long id) throws SQLException {
+        String sql = "SELECT id, resource_id, starts_at, ends_at FROM slots WHERE id = ?";
+        return findOne(connection, id, sql);
+    }
+
+    @Override
+    public Optional<Slot> lockById(Connection connection, long id) throws SQLException {
+        if (connection.getAutoCommit()) {
+            throw new IllegalStateException("Для блокировки слота нужна явная транзакция.");
+        }
+        String sql = "SELECT id, resource_id, starts_at, ends_at FROM slots WHERE id = ? FOR UPDATE";
+        return findOne(connection, id, sql);
+    }
+
+    private Optional<Slot> findOne(Connection connection, long id, String sql) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setQueryTimeout(5);
+            statement.setLong(1, id);
+            try (ResultSet rows = statement.executeQuery()) {
+                if (rows.next()) {
+                    return Optional.of(readSlot(rows));
+                }
+                return Optional.empty();
+            }
+        }
+    }
+
     @Override
     public List<Slot> findAvailable(Connection connection, long resourceId, Instant from, Instant to) throws SQLException {
         String sql = """

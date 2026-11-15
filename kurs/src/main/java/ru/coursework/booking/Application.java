@@ -8,6 +8,9 @@ import ru.coursework.booking.core.transport.http.HttpServer;
 import ru.coursework.booking.features.resources.repository.postgres.PostgresResourceRepository;
 import ru.coursework.booking.features.resources.service.ResourceService;
 import ru.coursework.booking.features.resources.transport.http.ResourceHandler;
+import ru.coursework.booking.features.slots.repository.postgres.PostgresSlotRepository;
+import ru.coursework.booking.features.slots.service.SlotService;
+import ru.coursework.booking.features.slots.transport.http.SlotHandler;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -27,8 +30,10 @@ public class Application {
             int appliedMigrations = new MigrationRunner(config).migrate();
             LOGGER.info("Схема PostgreSQL готова. Применено миграций: " + appliedMigrations + ".");
             ConnectionFactory connections = new ConnectionFactory(config);
-            ResourceService resources = new ResourceService(connections, new PostgresResourceRepository());
-            Javalin server = HttpServer.create(new ResourceHandler(resources));
+            PostgresResourceRepository resourceRepository = new PostgresResourceRepository();
+            ResourceService resources = new ResourceService(connections, resourceRepository);
+            SlotService slots = new SlotService(connections, resourceRepository, new PostgresSlotRepository());
+            Javalin server = HttpServer.create(new ResourceHandler(resources), new SlotHandler(slots));
             try {
                 server.start(config.getHttpHost(), config.getHttpPort());
             } catch (RuntimeException exception) {

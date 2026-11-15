@@ -29,7 +29,21 @@ public final class PostgresResourceRepository implements ResourceRepository {
     @Override
     public Optional<Resource> findById(Connection connection, long id) throws SQLException {
         String sql = "SELECT id, name, type, capacity, active FROM resources WHERE id = ?";
+        return findOne(connection, id, sql);
+    }
+
+    @Override
+    public Optional<Resource> lockById(Connection connection, long id) throws SQLException {
+        if (connection.getAutoCommit()) {
+            throw new IllegalStateException("Для блокировки ресурса нужна явная транзакция.");
+        }
+        String sql = "SELECT id, name, type, capacity, active FROM resources WHERE id = ? FOR UPDATE";
+        return findOne(connection, id, sql);
+    }
+
+    private Optional<Resource> findOne(Connection connection, long id, String sql) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setQueryTimeout(5);
             statement.setLong(1, id);
             try (ResultSet rows = statement.executeQuery()) {
                 if (rows.next()) {

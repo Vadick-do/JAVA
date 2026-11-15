@@ -6,6 +6,7 @@ import io.javalin.json.JavalinJackson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ru.coursework.booking.features.resources.transport.http.ResourceHandler;
+import ru.coursework.booking.features.slots.transport.http.SlotHandler;
 
 import java.util.Map;
 
@@ -15,13 +16,14 @@ public final class HttpServer {
     private HttpServer() {
     }
 
-    public static Javalin create(ResourceHandler resources) {
+    public static Javalin create(ResourceHandler resources, SlotHandler slots) {
         return Javalin.create(config -> {
             config.concurrency.useVirtualThreads = false;
             config.jsonMapper(new JavalinJackson());
             config.routes.get("/health", context -> context.json(Map.of("status", "UP")));
             config.routes.get("/api/v1/resources", resources::findAll);
             config.routes.get("/api/v1/resources/{id}", resources::findById);
+            config.routes.get("/api/v1/resources/{id}/slots", slots::findAvailable);
             config.routes.exception(HttpResponseException.class, (exception, context) -> {
                 String code = "HTTP_ERROR";
                 String message = "Запрос не может быть выполнен.";

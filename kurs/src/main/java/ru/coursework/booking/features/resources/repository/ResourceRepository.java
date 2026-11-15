@@ -11,4 +11,6 @@ public interface ResourceRepository {
     List<Resource> findAll(Connection connection) throws SQLException;
 
     Optional<Resource> findById(Connection connection, long id) throws SQLException;
+
+    Optional<Resource> lockById(Connection connection, long id) throws SQLException;
 }
