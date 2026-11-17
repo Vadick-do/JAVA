@@ -1,6 +1,8 @@
 package ru.coursework.booking.features.bookings.repository.postgres;
 
 import ru.coursework.booking.core.domain.Booking;
+import ru.coursework.booking.core.domain.BookingStatus;
+import ru.coursework.booking.core.domain.Slot;
 import ru.coursework.booking.features.bookings.repository.BookingRepository;
 
 import java.sql.Connection;
@@ -10,8 +12,41 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Optional;
+import java.util.UUID;
 
 public final class PostgresBookingRepository implements BookingRepository {
+    @Override
+    public Optional<Booking> findById(Connection connection, UUID id) throws SQLException {
+        String sql = """
+                SELECT b.id, b.status, b.created_at, b.expires_at, b.customer_name, b.customer_contact,
+                       b.confirmed_at, b.cancelled_at, s.id AS slot_id, s.resource_id, s.starts_at, s.ends_at
+                FROM bookings b JOIN slots s ON s.id = b.slot_id
+                WHERE b.id = ?
+                """;
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setQueryTimeout(5);
+            statement.setObject(1, id);
+            try (ResultSet rows = statement.executeQuery()) {
+                if (!rows.next()) {
+                    return Optional.empty();
+                }
+                Slot slot = new Slot(rows.getLong("slot_id"), rows.getLong("resource_id"),
+                        readInstant(rows, "starts_at"), readInstant(rows, "ends_at"));
+                return Optional.of(Booking.restore(rows.getObject("id", UUID.class), slot,
+                        BookingStatus.valueOf(rows.getString("status")),
+                        readInstant(rows, "created_at"), readInstant(rows, "expires_at"),
+                        rows.getString("customer_name"), rows.getString("customer_contact"),
+                        readInstant(rows, "confirmed_at"), readInstant(rows, "cancelled_at")));
+            }
+        }
+    }
+
+    private Instant readInstant(ResultSet rows, String column) throws SQLException {
+        OffsetDateTime value = rows.getObject(column, OffsetDateTime.class);
+        return value == null ? null : value.toInstant();
+    }
+
     @Override
     public void expireHolds(Connection connection, long slotId, Instant now) throws SQLException {
         String sql = """

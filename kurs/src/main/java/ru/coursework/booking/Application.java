@@ -5,6 +5,9 @@ import ru.coursework.booking.core.config.AppConfig;
 import ru.coursework.booking.core.repository.postgres.MigrationRunner;
 import ru.coursework.booking.core.repository.postgres.ConnectionFactory;
 import ru.coursework.booking.core.transport.http.HttpServer;
+import ru.coursework.booking.features.bookings.repository.postgres.PostgresBookingRepository;
+import ru.coursework.booking.features.bookings.service.BookingService;
+import ru.coursework.booking.features.bookings.transport.http.BookingHandler;
 import ru.coursework.booking.features.resources.repository.postgres.PostgresResourceRepository;
 import ru.coursework.booking.features.resources.service.ResourceService;
 import ru.coursework.booking.features.resources.transport.http.ResourceHandler;
@@ -32,8 +35,12 @@ public class Application {
             ConnectionFactory connections = new ConnectionFactory(config);
             PostgresResourceRepository resourceRepository = new PostgresResourceRepository();
             ResourceService resources = new ResourceService(connections, resourceRepository);
-            SlotService slots = new SlotService(connections, resourceRepository, new PostgresSlotRepository());
-            Javalin server = HttpServer.create(new ResourceHandler(resources), new SlotHandler(slots));
+            PostgresSlotRepository slotRepository = new PostgresSlotRepository();
+            SlotService slots = new SlotService(connections, resourceRepository, slotRepository);
+            BookingService bookings = new BookingService(connections, resourceRepository, slotRepository,
+                    new PostgresBookingRepository());
+            Javalin server = HttpServer.create(new ResourceHandler(resources), new SlotHandler(slots),
+                    new BookingHandler(bookings));
             try {
                 server.start(config.getHttpHost(), config.getHttpPort());
             } catch (RuntimeException exception) {

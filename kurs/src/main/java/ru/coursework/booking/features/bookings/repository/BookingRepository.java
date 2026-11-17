@@ -5,8 +5,12 @@ import ru.coursework.booking.core.domain.Booking;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
 
 public interface BookingRepository {
+    Optional<Booking> findById(Connection connection, UUID id) throws SQLException;
+
     Instant currentTime(Connection connection) throws SQLException;
 
     boolean hasActiveBooking(Connection connection, long slotId, Instant now) throws SQLException;

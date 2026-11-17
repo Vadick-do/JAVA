@@ -14,6 +14,9 @@ import ru.coursework.booking.core.config.AppConfig;
 import ru.coursework.booking.core.repository.postgres.ConnectionFactory;
 import ru.coursework.booking.core.repository.postgres.MigrationRunner;
 import ru.coursework.booking.core.transport.http.HttpServer;
+import ru.coursework.booking.features.bookings.repository.postgres.PostgresBookingRepository;
+import ru.coursework.booking.features.bookings.service.BookingService;
+import ru.coursework.booking.features.bookings.transport.http.BookingHandler;
 import ru.coursework.booking.features.resources.repository.postgres.PostgresResourceRepository;
 import ru.coursework.booking.features.resources.service.ResourceService;
 import ru.coursework.booking.features.resources.transport.http.ResourceHandler;
@@ -81,7 +84,9 @@ class SlotHttpIT {
         PostgresResourceRepository resources = new PostgresResourceRepository();
         ResourceService resourceService = new ResourceService(connections, resources);
         SlotService slotService = new SlotService(connections, resources, new PostgresSlotRepository());
-        server = HttpServer.create(new ResourceHandler(resourceService), new SlotHandler(slotService))
+        BookingService bookings = new BookingService(connections, resources,
+                new PostgresSlotRepository(), new PostgresBookingRepository());
+        server = HttpServer.create(new ResourceHandler(resourceService), new SlotHandler(slotService), new BookingHandler(bookings))
                 .start("127.0.0.1", 0);
         client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
     }

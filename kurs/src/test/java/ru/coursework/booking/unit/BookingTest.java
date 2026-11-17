@@ -179,4 +179,38 @@ class BookingTest {
         assertThrows(IllegalArgumentException.class, () -> cancelled.cancel(earlier));
         assertThrows(IllegalArgumentException.class, () -> cancelled.expire(earlier));
     }
+
+    @Test
+    void restoresHistoryWithoutReplayingTransitionsOrExtendingDeadline() {
+        Booking confirmed = hold.confirm("Анна", "контакт", createdAt.plusSeconds(30));
+        Booking[] history = {hold, confirmed, hold.cancel(createdAt.plusSeconds(60)),
+                confirmed.cancel(startsAt), hold.expire(hold.getExpiresAt())};
+        for (Booking original : history) {
+            Booking restored = Booking.restore(original.getId(), slot, original.getStatus(),
+                    original.getCreatedAt(), original.getExpiresAt(), original.getCustomerName(),
+                    original.getCustomerContact(), original.getConfirmedAt(), original.getCancelledAt());
+            assertEquals(original.getStatus(), restored.getStatus());
+            assertEquals(original.getCreatedAt(), restored.getCreatedAt());
+            assertEquals(original.getExpiresAt(), restored.getExpiresAt());
+            assertEquals(original.getCustomerName(), restored.getCustomerName());
+            assertEquals(original.getCustomerContact(), restored.getCustomerContact());
+            assertEquals(original.getConfirmedAt(), restored.getConfirmedAt());
+            assertEquals(original.getCancelledAt(), restored.getCancelledAt());
+            assertEquals(original.getEffectiveStatus(startsAt), restored.getEffectiveStatus(startsAt));
+        }
+    }
+
+    @Test
+    void rejectsInconsistentSavedDeadlineStatusAndChronology() {
+        assertThrows(IllegalArgumentException.class, () -> Booking.restore(id, slot, BookingStatus.HOLD,
+                createdAt, createdAt.plusSeconds(601), null, null, null, null));
+        assertThrows(IllegalArgumentException.class, () -> Booking.restore(id, slot, BookingStatus.CONFIRMED,
+                createdAt, hold.getExpiresAt(), null, null, null, null));
+        assertThrows(IllegalArgumentException.class, () -> Booking.restore(id, slot, BookingStatus.HOLD,
+                createdAt, hold.getExpiresAt(), "Анна", "контакт", createdAt, null));
+        assertThrows(IllegalArgumentException.class, () -> Booking.restore(id, slot, BookingStatus.CANCELLED,
+                createdAt, hold.getExpiresAt(), "Анна", "контакт", createdAt.plusSeconds(60), createdAt));
+        assertThrows(IllegalArgumentException.class, () -> Booking.restore(id, slot, BookingStatus.CONFIRMED,
+                createdAt, hold.getExpiresAt(), "Анна", "контакт", hold.getExpiresAt(), null));
+    }
 }

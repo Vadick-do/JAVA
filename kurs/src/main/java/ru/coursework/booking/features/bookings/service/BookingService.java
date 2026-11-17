@@ -41,7 +41,7 @@ public final class BookingService {
                 Resource resource = resources.lockById(connection, preliminary.getResourceId())
                         .orElseThrow(() -> new NoSuchElementException("Ресурс не найден."));
                 if (!resource.isActive()) {
-                    throw new IllegalStateException("Ресурс неактивен.");
+                    throw new ResourceInactiveException();
                 }
                 Slot slot = slots.lockById(connection, slotId)
                         .orElseThrow(() -> new NoSuchElementException("Слот не найден."));
@@ -65,6 +65,17 @@ public final class BookingService {
                 }
                 throw error;
             }
+        }
+    }
+
+    public Booking findById(UUID id) throws SQLException {
+        if (id == null) {
+            throw new IllegalArgumentException("ID брони должен быть указан.");
+        }
+        try (Connection connection = connections.open()) {
+            Booking booking = bookings.findById(connection, id)
+                    .orElseThrow(() -> new NoSuchElementException("Бронь не найдена."));
+            return booking.expire(bookings.currentTime(connection));
         }
     }
 }

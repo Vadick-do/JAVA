@@ -40,6 +40,40 @@ public final class Booking {
         return new Booking(id, slot, BookingStatus.HOLD, now, null, null, null, null);
     }
 
+    public static Booking restore(UUID id, Slot slot, BookingStatus status, Instant createdAt, Instant expiresAt,
+                                  String customerName, String customerContact, Instant confirmedAt, Instant cancelledAt) {
+        if (id == null || slot == null || status == null || createdAt == null || expiresAt == null) {
+            throw new IllegalArgumentException("Сохранённая бронь должна содержать ID, слот, статус и сроки.");
+        }
+        if (!expiresAt.equals(createdAt.plus(HOLD_DURATION))) {
+            throw new IllegalArgumentException("Срок сохранённого холда должен составлять 10 минут.");
+        }
+        if (confirmedAt == null) {
+            if (customerName != null || customerContact != null) {
+                throw new IllegalArgumentException("Данные клиента требуют времени подтверждения.");
+            }
+        } else {
+            normalizeCustomerField(customerName, 100, "Имя клиента");
+            normalizeCustomerField(customerContact, 200, "Контакт клиента");
+            if (confirmedAt.isBefore(createdAt) || !confirmedAt.isBefore(expiresAt)) {
+                throw new IllegalArgumentException("Некорректное время подтверждения сохранённой брони.");
+            }
+        }
+        Instant lastChangedAt = confirmedAt == null ? createdAt : confirmedAt;
+        if (cancelledAt != null && cancelledAt.isBefore(lastChangedAt)) {
+            throw new IllegalArgumentException("Отмена не может предшествовать созданию или подтверждению.");
+        }
+        boolean validStatus = switch (status) {
+            case HOLD, EXPIRED -> confirmedAt == null && cancelledAt == null;
+            case CONFIRMED -> confirmedAt != null && cancelledAt == null;
+            case CANCELLED -> cancelledAt != null;
+        };
+        if (!validStatus) {
+            throw new IllegalArgumentException("Поля сохранённой брони не соответствуют статусу.");
+        }
+        return new Booking(id, slot, status, createdAt, customerName, customerContact, confirmedAt, cancelledAt);
+    }
+
     public BookingStatus getEffectiveStatus(Instant now) {
         if (now == null) {
             throw new IllegalArgumentException("Текущее время должно быть указано.");
