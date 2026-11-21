@@ -11,7 +11,7 @@ make test
 
 - `make build` проверяет проект Maven на JDK 21 и собирает образ приложения с JRE 21.
 - `make test` запускает unit-тесты в отдельном контейнере без PostgreSQL. Maven берёт зависимости из образа сборки.
-- `make test-integration` проверяет миграции, ограничения, чтение ресурсов и свободных слотов через сервисы и JDBC и HTTP API на настоящей PostgreSQL. Для каждого класса `*IT.java` создаётся временная PostgreSQL в отдельном проекте Compose. После проверки класса тестовый том удаляется, поэтому наборы не зависят от данных друг друга.
+- `make test-integration` проверяет миграции, ограничения, сервисы и HTTP API на настоящей PostgreSQL. Тесты холдов проверяют серии из 2 и 16 попыток на одном слоте, успешную бронь другого ресурса при удерживаемой блокировке и работу после конфликта. Для каждого класса `*IT.java` создаётся временная PostgreSQL в отдельном проекте Compose. После проверки класса тестовый том удаляется, поэтому наборы не зависят от данных друг друга.
 
 ## Запуск с PostgreSQL
 
@@ -85,6 +85,14 @@ curl -i http://127.0.0.1:18080/health
 | `GET /api/v1/resources/abc` | 400, неверный ID; также для нуля, отрицательного числа и переполнения `long` |
 | `GET /api/v1/resources/9223372036854775807` | 404, если такой записи нет |
 | `GET /api/v1/resources/7/slots?from=2030-01-01T00:00:00Z&to=2030-01-02T00:00:00Z` | 200, массив свободных слотов ресурса за указанный диапазон |
+| `POST /api/v1/holds` с JSON `{"slotId":42}` | 201, новый десятиминутный холд для свободного будущего слота |
+| `GET /api/v1/bookings/{id}` с UUID брони | 200, текущее состояние брони. Истёкший холд возвращается со статусом `EXPIRED` |
+| `POST /api/v1/bookings/{id}/confirm` с JSON `{"customerName":"Анна","customerContact":"anna@example.test"}` | 200, подтверждённая бронь. Повтор с теми же данными возвращает ту же бронь |
+| `POST /api/v1/bookings/{id}/cancel` без тела запроса | 200, бронь в конечном статусе `CANCELLED` или `EXPIRED` |
+
+При подтверждении пробелы по краям имени и контакта удаляются. Имя содержит от 1 до 100 символов, контакт — от 1 до 200. Истёкший или отменённый холд, начавшийся слот с неподтверждённым холдом и повтор с другими данными дают 409 `BOOKING_CONFLICT`.
+
+Отмена действующего холда или подтверждённой брони освобождает слот и сохраняет историю. Истёкший холд сохраняется как `EXPIRED`. Повторный запрос возвращает сохранённое состояние без изменения дат. Некорректный UUID даёт 400, неизвестный UUID — 404.
 
 Карточка неактивного ресурса и неизвестный маршрут возвращают 404. Поля ресурса: `id`, `name`, `type` (`TABLE` или `MEETING_ROOM`), `capacity`, `active`. HTTP-ответы имеют Content-Type `application/json`. Ошибка имеет поля `code` и `message`: `INVALID_REQUEST` для 400, `NOT_FOUND` для 404, `INTERNAL_ERROR` для внутреннего сбоя 500. Ответ 500 не содержит SQL, параметров подключения или stack trace. `/health` не обращается к БД и не доказывает её доступность. Демо-данные автоматически не добавляются.
 
@@ -111,3 +119,41 @@ curl -i http://127.0.0.1:18080/health
 Сервис владеет соединением; оба репозитория используют его и закрывают только свои команды и результаты. Список отражает доступность на момент запроса и не резервирует слот.
 
 HTTP-маршрут `GET /api/v1/resources/{id}/slots` принимает ровно по одному параметру `from` и `to` в ISO 8601 с `Z` или явным смещением UTC. Даты без смещения, пропущенные, пустые и повторяющиеся параметры, неверный ID, `from >= to` и диапазон больше 7 суток возвращают 400. Неизвестный ресурс возвращает 404; существующий неактивный ресурс — 200 с `[]`. Поля слота: `id`, `resourceId`, `startsAt`, `endsAt`; время ответа — строки UTC с `Z`. При передаче положительного смещения знак `+` кодируется как `%2B`.
+
+## Демонстрация холда и конфликта
+
+Сценарий использует локальную демонстрационную БД после `make up`. Запрос в Query Tool pgAdmin создаёт активный ресурс с одним будущим слотом и возвращает его `slot_id`.
+
+```sql
+WITH demo_resource AS (
+    INSERT INTO resources (name, type, capacity)
+    VALUES ('Демо-стол', 'TABLE', 4)
+    RETURNING id
+), demo_time AS (
+    SELECT date_trunc('hour', statement_timestamp(), 'UTC') + INTERVAL '24 hours' AS starts_at
+)
+INSERT INTO slots (resource_id, starts_at, ends_at)
+SELECT demo_resource.id, demo_time.starts_at, demo_time.starts_at + INTERVAL '1 hour'
+FROM demo_resource CROSS JOIN demo_time
+RETURNING id AS slot_id;
+```
+
+Три POST-запроса проверяют ответ 400 с `INVALID_REQUEST`, успешный ответ 201 с `status: HOLD` и повторную попытку на том же слоте. До истечения холда повторная попытка возвращает 409 с `BOOKING_CONFLICT`.
+
+```sh
+base_url=http://127.0.0.1:8080
+printf 'slot_id: '
+read -r slot_id
+curl -i -H 'Content-Type: application/json' --data '{"slotId":0}' "$base_url/api/v1/holds"
+body=$(printf '{"slotId":%s}' "$slot_id")
+curl -i -H 'Content-Type: application/json' --data "$body" "$base_url/api/v1/holds"
+curl -i -H 'Content-Type: application/json' --data "$body" "$base_url/api/v1/holds"
+```
+
+GET по полю `id` из ответа 201 возвращает ту же бронь с исходным сроком `expiresAt`.
+
+```sh
+printf 'UUID брони: '
+read -r booking_id
+curl -i "$base_url/api/v1/bookings/$booking_id"
+```

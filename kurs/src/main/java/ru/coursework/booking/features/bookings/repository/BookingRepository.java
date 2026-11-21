@@ -18,4 +18,8 @@ public interface BookingRepository {
     void expireHolds(Connection connection, long slotId, Instant now) throws SQLException;
 
     void insertHold(Connection connection, Booking booking) throws SQLException;
+
+    void updateConfirmation(Connection connection, Booking booking) throws SQLException;
+
+    void updateCancellation(Connection connection, Booking booking) throws SQLException;
 }

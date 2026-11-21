@@ -99,7 +99,7 @@ public final class Booking {
         String normalizedContact = normalizeCustomerField(contact, 200, "Контакт клиента");
         BookingStatus effectiveStatus = getEffectiveStatus(now);
         if (effectiveStatus == BookingStatus.CONFIRMED) {
-            if (customerName.equals(normalizedName) && customerContact.equals(normalizedContact)) {
+            if (customerName.strip().equals(normalizedName) && customerContact.strip().equals(normalizedContact)) {
                 return this;
             }
             throw new IllegalStateException("Бронь уже подтверждена с другими данными клиента.");
@@ -108,6 +108,11 @@ public final class Booking {
             throw new IllegalStateException("Подтвердить можно только действующий холд.");
         }
         return new Booking(id, slot, BookingStatus.CONFIRMED, createdAt, normalizedName, normalizedContact, now, null);
+    }
+
+    public static void validateCustomerDetails(String name, String contact) {
+        normalizeCustomerField(name, 100, "Имя клиента");
+        normalizeCustomerField(contact, 200, "Контакт клиента");
     }
 
     public Booking cancel(Instant now) {
@@ -131,6 +136,9 @@ public final class Booking {
             throw new IllegalArgumentException(field + " не может быть пустым.");
         }
         String normalizedValue = value.strip();
+        if (normalizedValue.indexOf(0) >= 0) {
+            throw new IllegalArgumentException(field + " содержит недопустимый символ.");
+        }
         if (normalizedValue.codePointCount(0, normalizedValue.length()) > maxLength) {
             throw new IllegalArgumentException(field + " не может содержать больше " + maxLength + " символов.");
         }

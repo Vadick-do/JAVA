@@ -37,17 +37,34 @@ public final class BookingHandler {
         context.status(201).json(BookingResponse.from(booking));
     }
 
-    public void findById(Context context) throws SQLException {
-        String value = context.pathParam("id");
-        UUID id;
+    public void confirmBooking(Context context) throws SQLException {
+        UUID id = parseBookingId(context.pathParam("id"));
+        ConfirmBookingRequest request = ConfirmBookingRequest.from(context.bodyAsClass(JsonNode.class));
+        Booking booking;
         try {
-            id = UUID.fromString(value);
-            if (!id.toString().equalsIgnoreCase(value)) {
-                throw new IllegalArgumentException("Неканонический UUID.");
-            }
-        } catch (IllegalArgumentException exception) {
-            throw new BadRequestResponse("ID брони должен быть UUID.");
+            booking = service.confirmBooking(id, request.customerName(), request.customerContact());
+        } catch (NoSuchElementException exception) {
+            throw new NotFoundResponse("Бронь не найдена.");
+        } catch (IllegalStateException exception) {
+            context.status(409).json(new ErrorResponse("BOOKING_CONFLICT", "Подтверждение брони невозможно."));
+            return;
         }
+        context.json(BookingResponse.from(booking));
+    }
+
+    public void cancelBooking(Context context) throws SQLException {
+        UUID id = parseBookingId(context.pathParam("id"));
+        Booking booking;
+        try {
+            booking = service.cancelBooking(id);
+        } catch (NoSuchElementException exception) {
+            throw new NotFoundResponse("Бронь не найдена.");
+        }
+        context.json(BookingResponse.from(booking));
+    }
+
+    public void findById(Context context) throws SQLException {
+        UUID id = parseBookingId(context.pathParam("id"));
         Booking booking;
         try {
             booking = service.findById(id);
@@ -55,5 +72,17 @@ public final class BookingHandler {
             throw new NotFoundResponse("Бронь не найдена.");
         }
         context.json(BookingResponse.from(booking));
+    }
+
+    private UUID parseBookingId(String value) {
+        try {
+            UUID id = UUID.fromString(value);
+            if (!id.toString().equalsIgnoreCase(value)) {
+                throw new IllegalArgumentException("Неканонический UUID.");
+            }
+            return id;
+        } catch (IllegalArgumentException exception) {
+            throw new BadRequestResponse("ID брони должен быть UUID.");
+        }
     }
 }

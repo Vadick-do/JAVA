@@ -42,11 +42,13 @@ import java.time.ZoneOffset;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Timeout(20)
 class BookingHttpIT {
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final String CUSTOMER = "{\"customerName\":\"Анна\",\"customerContact\":\"anna@example.test\"}";
     private static ConnectionFactory connections;
     private Javalin server;
     private HttpClient client;
@@ -203,12 +205,142 @@ class BookingHttpIT {
     }
 
     @Test
-    void hidesSqlFailureForBothRoutesAndRecoversAfterRestoration() throws Exception {
+    void confirmsOnceWithNormalizedDetailsAndPreservesTheOriginalTimes() throws Exception {
+        HttpResponse<String> created = post("{\"slotId\":3000000000}");
+        assertJsonStatus(created, 201);
+        JsonNode hold = JSON.readTree(created.body());
+        UUID id = UUID.fromString(hold.get("id").asText());
+        executeSql("UPDATE resources SET active = FALSE WHERE id = 1");
+
+        HttpResponse<String> response = confirm(id, "{\"customerName\":\"  Анна  \","
+                + "\"customerContact\":\" anna@example.test \"}");
+        assertJsonStatus(response, 200);
+        JsonNode booking = JSON.readTree(response.body());
+        assertEquals("CONFIRMED", booking.get("status").asText());
+        assertEquals("Анна", booking.get("customerName").asText());
+        assertEquals("anna@example.test", booking.get("customerContact").asText());
+        for (String field : new String[]{"id", "slotId", "createdAt", "expiresAt", "cancelledAt"}) {
+            assertEquals(hold.get(field), booking.get(field));
+        }
+        Instant confirmedAt = Instant.parse(booking.get("confirmedAt").asText());
+        assertTrue(!confirmedAt.isBefore(Instant.parse(hold.get("createdAt").asText())));
+        assertTrue(confirmedAt.isBefore(Instant.parse(hold.get("expiresAt").asText())));
+        assertStoredStatus(id, "CONFIRMED");
+        assertEquals(booking, readBooking(id));
+
+        HttpResponse<String> repeated = confirm(id, CUSTOMER);
+        assertJsonStatus(repeated, 200);
+        assertEquals(booking, JSON.readTree(repeated.body()));
+        assertConfirmationConflict(confirm(id, CUSTOMER.replace("anna@", "new@")));
+        assertEquals(booking, readBooking(id));
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = BookingStatus.class, names = {"HOLD", "CANCELLED", "EXPIRED"})
+    void rejectsExpiredAndTerminalBookingsAndPersistsExpiration(BookingStatus status) throws Exception {
+        UUID id = insertBooking(status);
+        assertStoredStatus(id, status.name());
+        assertConfirmationConflict(confirm(id, CUSTOMER));
+        assertStoredStatus(id, status == BookingStatus.HOLD ? "EXPIRED" : status.name());
+    }
+
+    @Test
+    void rejectsMissingBookingAndInvalidConfirmationInput() throws Exception {
+        assertError(send("/api/v1/bookings/1-1-1-1-1/confirm", CUSTOMER), 400, "INVALID_REQUEST");
+        assertError(confirm(UUID.randomUUID(), CUSTOMER), 404, "NOT_FOUND");
+        UUID id = insertBooking(BookingStatus.HOLD);
+        for (String body : new String[]{"", "{}", "{\"customerName\":3,\"customerContact\":\"контакт\"}",
+                CUSTOMER.replace("Анна", " "), CUSTOMER.replace("Анна", "я".repeat(101)),
+                CUSTOMER.replace("anna@example.test", "я".repeat(201)),
+                CUSTOMER.replace("Анна", "\\u0000"), CUSTOMER + " {}",
+                CUSTOMER.replace("}", ",\"customerName\":\"Анна\"}"),
+                CUSTOMER.replace("}", ",\"slotId\":1}")}) {
+            assertError(confirm(id, body), 400, "INVALID_REQUEST");
+        }
+        assertStoredStatus(id, "HOLD");
+    }
+
+    @Test
+    void cancelsHoldAndConfirmedBookingAndAllowsEachSlotToBeReused() throws Exception {
+        String body = "{\"slotId\":3000000000}";
+        String availableSlots = "/api/v1/resources/1/slots?from=" + futureHour
+                + "&to=" + futureHour.plusSeconds(3600);
+        HttpResponse<String> created = post(body);
+        assertJsonStatus(created, 201);
+        JsonNode active = JSON.readTree(created.body());
+        for (BookingStatus initial : new BookingStatus[]{BookingStatus.HOLD, BookingStatus.CONFIRMED}) {
+            String id = active.get("id").asText();
+            UUID uuid = UUID.fromString(id);
+            if (initial == BookingStatus.CONFIRMED) {
+                HttpResponse<String> confirmed = confirm(uuid, CUSTOMER);
+                assertJsonStatus(confirmed, 200);
+                active = JSON.readTree(confirmed.body());
+            }
+            assertEquals(initial.name(), active.get("status").asText());
+            assertEquals(0, JSON.readTree(get(availableSlots).body()).size());
+
+            HttpResponse<String> response = cancel(id);
+            assertJsonStatus(response, 200);
+            JsonNode cancelled = JSON.readTree(response.body());
+            assertEquals("CANCELLED", cancelled.get("status").asText());
+            for (String field : new String[]{"id", "slotId", "createdAt", "expiresAt",
+                    "customerName", "customerContact", "confirmedAt"}) {
+                assertEquals(active.get(field), cancelled.get(field));
+            }
+            Instant cancelledAt = Instant.parse(cancelled.get("cancelledAt").asText());
+            String previousTime = initial == BookingStatus.HOLD ? "createdAt" : "confirmedAt";
+            assertTrue(!cancelledAt.isBefore(Instant.parse(active.get(previousTime).asText())));
+            assertStoredStatus(uuid, "CANCELLED");
+            assertEquals(cancelled, readBooking(uuid));
+            assertConfirmationConflict(confirm(uuid, CUSTOMER));
+
+            HttpResponse<String> available = get(availableSlots);
+            assertJsonStatus(available, 200);
+            JsonNode slots = JSON.readTree(available.body());
+            assertEquals(1, slots.size());
+            assertEquals(active.get("slotId"), slots.get(0).get("id"));
+            HttpResponse<String> replacement = post(body);
+            assertJsonStatus(replacement, 201);
+            active = JSON.readTree(replacement.body());
+            assertNotEquals(id, active.get("id").asText());
+
+            HttpResponse<String> repeated = cancel(id);
+            assertJsonStatus(repeated, 200);
+            assertEquals(cancelled, JSON.readTree(repeated.body()));
+            assertStoredStatus(UUID.fromString(active.get("id").asText()), "HOLD");
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = BookingStatus.class, names = {"HOLD", "EXPIRED"})
+    void returnsAndPersistsExpiredWithoutRecordingCancellation(BookingStatus status) throws Exception {
+        UUID id = insertBooking(status);
+        assertStoredStatus(id, status.name());
+        JsonNode before = readBooking(id);
+        HttpResponse<String> response = cancel(id.toString());
+        assertJsonStatus(response, 200);
+        assertEquals(before, JSON.readTree(response.body()));
+        assertEquals("EXPIRED", before.get("status").asText());
+        assertTrue(before.get("cancelledAt").isNull());
+        assertStoredStatus(id, "EXPIRED");
+        assertEquals(before, readBooking(id));
+    }
+
+    @Test
+    void rejectsMissingBookingAndInvalidCancellationId() throws Exception {
+        assertError(cancel("1-1-1-1-1"), 400, "INVALID_REQUEST");
+        assertError(cancel(UUID.randomUUID().toString()), 404, "NOT_FOUND");
+    }
+
+    @Test
+    void hidesSqlFailureForBookingRoutesAndRecoversAfterRestoration() throws Exception {
         UUID id = insertBooking(BookingStatus.EXPIRED);
         executeSql("ALTER TABLE bookings RENAME TO bookings_unavailable");
         try {
             assertError(post("{\"slotId\":3000000000}"), 500, "INTERNAL_ERROR");
             assertError(get("/api/v1/bookings/" + id), 500, "INTERNAL_ERROR");
+            assertError(confirm(id, CUSTOMER), 500, "INTERNAL_ERROR");
+            assertError(cancel(id.toString()), 500, "INTERNAL_ERROR");
             assertError(post("{\"slotId\":0}"), 400, "INVALID_REQUEST");
             assertError(get("/api/v1/bookings/1-1-1-1-1"), 400, "INVALID_REQUEST");
             assertJsonStatus(get("/health"), 200);
@@ -231,6 +363,19 @@ class BookingHttpIT {
 
     private HttpResponse<String> post(String body) throws Exception {
         return send("/api/v1/holds", body);
+    }
+
+    private HttpResponse<String> confirm(UUID id, String body) throws Exception {
+        return send("/api/v1/bookings/" + id + "/confirm", body);
+    }
+
+    private HttpResponse<String> cancel(String id) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder(URI.create(
+                        "http://127.0.0.1:" + server.port() + "/api/v1/bookings/" + id + "/cancel"))
+                .timeout(Duration.ofSeconds(7))
+                .POST(HttpRequest.BodyPublishers.noBody())
+                .build();
+        return client.send(request, HttpResponse.BodyHandlers.ofString());
     }
 
     private HttpResponse<String> send(String path, String body) throws Exception {
@@ -261,6 +406,14 @@ class BookingHttpIT {
             default -> "Внутренняя ошибка сервера.";
         };
         assertEquals(message, error.get("message").asText());
+    }
+
+    private void assertConfirmationConflict(HttpResponse<String> response) throws Exception {
+        assertJsonStatus(response, 409);
+        JsonNode error = JSON.readTree(response.body());
+        assertEquals(2, error.size());
+        assertEquals("BOOKING_CONFLICT", error.get("code").asText());
+        assertEquals("Подтверждение брони невозможно.", error.get("message").asText());
     }
 
     private void insertSlot(long id, long resourceId, Instant startsAt) throws SQLException {

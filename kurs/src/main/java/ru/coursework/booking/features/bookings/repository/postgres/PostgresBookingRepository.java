@@ -83,6 +83,42 @@ public final class PostgresBookingRepository implements BookingRepository {
     }
 
     @Override
+    public void updateConfirmation(Connection connection, Booking booking) throws SQLException {
+        String sql = """
+                UPDATE bookings
+                SET status = 'CONFIRMED', customer_name = ?, customer_contact = ?, confirmed_at = ?
+                WHERE id = ? AND status = 'HOLD'
+                """;
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setQueryTimeout(5);
+            statement.setString(1, booking.getCustomerName());
+            statement.setString(2, booking.getCustomerContact());
+            statement.setObject(3, booking.getConfirmedAt().atOffset(ZoneOffset.UTC));
+            statement.setObject(4, booking.getId());
+            if (statement.executeUpdate() != 1) {
+                throw new SQLException("Не удалось подтвердить холд.");
+            }
+        }
+    }
+
+    @Override
+    public void updateCancellation(Connection connection, Booking booking) throws SQLException {
+        String sql = """
+                UPDATE bookings
+                SET status = 'CANCELLED', cancelled_at = ?
+                WHERE id = ? AND status IN ('HOLD', 'CONFIRMED')
+                """;
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setQueryTimeout(5);
+            statement.setObject(1, booking.getCancelledAt().atOffset(ZoneOffset.UTC));
+            statement.setObject(2, booking.getId());
+            if (statement.executeUpdate() != 1) {
+                throw new SQLException("Не удалось отменить бронь.");
+            }
+        }
+    }
+
+    @Override
     public Instant currentTime(Connection connection) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("SELECT clock_timestamp()")) {
             statement.setQueryTimeout(5);

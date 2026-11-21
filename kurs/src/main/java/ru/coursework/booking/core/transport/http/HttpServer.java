@@ -32,6 +32,8 @@ public final class HttpServer {
             config.routes.get("/api/v1/resources/{id}/slots", slots::findAvailable);
             config.routes.post("/api/v1/holds", bookings::createHold);
             config.routes.get("/api/v1/bookings/{id}", bookings::findById);
+            config.routes.post("/api/v1/bookings/{id}/confirm", bookings::confirmBooking);
+            config.routes.post("/api/v1/bookings/{id}/cancel", bookings::cancelBooking);
             config.routes.exception(JsonProcessingException.class, (exception, context) ->
                     context.status(400).json(new ErrorResponse("INVALID_REQUEST", "Проверьте параметры запроса.")));
             config.routes.exception(HttpResponseException.class, (exception, context) -> {

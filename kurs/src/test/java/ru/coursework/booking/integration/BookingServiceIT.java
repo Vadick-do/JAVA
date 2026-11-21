@@ -31,7 +31,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -78,14 +77,16 @@ class BookingServiceIT {
             statement.executeUpdate("""
                     INSERT INTO resources (id, name, type, capacity, active) VALUES
                     (7, 'Стол', 'TABLE', 4, TRUE),
+                    (8, 'Зал', 'MEETING_ROOM', 6, TRUE),
                     (9, 'Закрытый зал', 'MEETING_ROOM', 8, FALSE)
                     """);
             statement.executeUpdate("""
                     INSERT INTO slots (id, resource_id, starts_at, ends_at)
-                    SELECT id, CASE WHEN id = 3 THEN 9 ELSE 7 END,
+                    SELECT id, resource_id,
                            date_trunc('hour', statement_timestamp(), 'UTC') + days * INTERVAL '1 day',
                            date_trunc('hour', statement_timestamp(), 'UTC') + days * INTERVAL '1 day' + INTERVAL '1 hour'
-                    FROM (VALUES (1, 1), (2, 2), (3, 1), (4, 0), (5, -1)) AS data(id, days)
+                    FROM (VALUES (1, 7, 1), (2, 7, 2), (3, 9, 1), (4, 7, 0), (5, 7, -1), (6, 8, 1))
+                        AS data(id, resource_id, days)
                     """);
         }
     }
@@ -125,35 +126,28 @@ class BookingServiceIT {
         assertEquals(1, countBookings());
     }
 
-    @Test
-    void allowsExactlyOneConcurrentHoldOnTheSameSlot() throws Exception {
+    @ParameterizedTest
+    @ValueSource(ints = {2, 16})
+    void allowsExactlyOneConcurrentHoldOnTheSameSlot(int competitorCount) throws Exception {
         long slotId = 1;
-        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch ready = new CountDownLatch(competitorCount);
         CountDownLatch start = new CountDownLatch(1);
-        Callable<Booking> attempt = () -> {
-            ready.countDown();
-            assertTrue(start.await(5, TimeUnit.SECONDS), "Тест не подал сигнал старта.");
-            return service.createHold(slotId);
-        };
 
         try (Connection blocker = connections.open(); Connection observer = connections.open()) {
-            int blockerPid;
-            try (var statement = blocker.createStatement(); var rows = statement.executeQuery("SELECT pg_backend_pid()")) {
-                assertTrue(rows.next());
-                blockerPid = rows.getInt(1);
-            }
-            ExecutorService workers = Executors.newFixedThreadPool(2);
-            List<Future<Booking>> attempts = new ArrayList<>(2);
+            int blockerPid = backendPid(blocker);
+            ExecutorService workers = Executors.newFixedThreadPool(competitorCount);
+            List<Future<Booking>> attempts = new ArrayList<>(competitorCount);
             try {
                 blocker.setAutoCommit(false);
                 List<Integer> workerPids;
                 try {
                     new PostgresSlotRepository().lockById(blocker, slotId).orElseThrow();
-                    attempts.add(workers.submit(attempt));
-                    attempts.add(workers.submit(attempt));
-                    assertTrue(ready.await(3, TimeUnit.SECONDS), "Оба потока должны дойти до сигнала старта.");
+                    for (int i = 0; i < competitorCount; i++) {
+                        attempts.add(submitHold(workers, ready, start, slotId));
+                    }
+                    assertTrue(ready.await(3, TimeUnit.SECONDS), "Все потоки должны дойти до сигнала старта.");
                     start.countDown();
-                    workerPids = awaitBlockedCompetitors(observer, blockerPid);
+                    workerPids = awaitBlockedCompetitors(observer, blockerPid, competitorCount);
                 } finally {
                     blocker.rollback();
                 }
@@ -170,15 +164,53 @@ class BookingServiceIT {
                 assertEquals(1, winners.size());
                 Booking winner = winners.getFirst();
                 assertEquals(slotId, winner.getSlotId());
-                assertEquals(BookingStatus.HOLD, winner.getStatus());
-                assertOnlyWinnerStored(observer, winner);
+                assertHoldsStored(observer, List.of(winner));
+                awaitClosedCompetitorConnections(observer, workerPids);
+                Booking next = service.createHold(2);
+                assertEquals(2, next.getSlotId());
+                assertHoldsStored(observer, List.of(winner, next));
+            } finally {
+                stopWorkers(workers, attempts);
+            }
+        }
+    }
+
+    @Test
+    void createsHoldsOnDifferentSlotsWhileAnotherResourceIsLocked() throws Exception {
+        CountDownLatch ready = new CountDownLatch(3);
+        CountDownLatch start = new CountDownLatch(1);
+
+        try (Connection blocker = connections.open(); Connection observer = connections.open()) {
+            int blockerPid = backendPid(blocker);
+            ExecutorService workers = Executors.newFixedThreadPool(3);
+            List<Future<Booking>> attempts = new ArrayList<>(3);
+            try {
+                blocker.setAutoCommit(false);
+                Booking independent;
+                List<Integer> workerPids;
+                try {
+                    new PostgresResourceRepository().lockById(blocker, 7).orElseThrow();
+                    for (long slotId : List.of(1L, 2L, 6L)) {
+                        attempts.add(submitHold(workers, ready, start, slotId));
+                    }
+                    assertTrue(ready.await(3, TimeUnit.SECONDS), "Все потоки должны дойти до сигнала старта.");
+                    start.countDown();
+                    workerPids = awaitBlockedCompetitors(observer, blockerPid, 2);
+                    independent = attempts.get(2).get(1, TimeUnit.SECONDS);
+                    assertEquals(6, independent.getSlotId());
+                    assertHoldsStored(observer, List.of(independent));
+                } finally {
+                    blocker.rollback();
+                }
+
+                Booking first = attempts.get(0).get(7, TimeUnit.SECONDS);
+                Booking second = attempts.get(1).get(7, TimeUnit.SECONDS);
+                assertEquals(1, first.getSlotId());
+                assertEquals(2, second.getSlotId());
+                assertHoldsStored(observer, List.of(first, second, independent));
                 awaitClosedCompetitorConnections(observer, workerPids);
             } finally {
-                for (Future<Booking> result : attempts) {
-                    result.cancel(true);
-                }
-                workers.shutdownNow();
-                assertTrue(workers.awaitTermination(7, TimeUnit.SECONDS), "Потоки бронирования не завершились.");
+                stopWorkers(workers, attempts);
             }
         }
     }
@@ -255,6 +287,84 @@ class BookingServiceIT {
     }
 
     @Test
+    void validatesConfirmationBeforeOpeningConnection() {
+        BookingService disconnected = new BookingService(null, null, null, null);
+        assertThrows(IllegalArgumentException.class, () -> disconnected.confirmBooking(null, "Анна", "контакт"));
+        UUID id = UUID.randomUUID();
+        assertThrows(IllegalArgumentException.class, () -> disconnected.confirmBooking(id, " ", "контакт"));
+        assertThrows(IllegalArgumentException.class, () -> disconnected.confirmBooking(id, "Анна", null));
+    }
+
+    @Test
+    void expiresUnconfirmedHoldWhenSlotHasStartedEvenIfTtlIsStillValid() throws SQLException {
+        UUID id;
+        try (Connection connection = connections.open()) {
+            id = insertBooking(connection, 4, "HOLD", bookings.currentTime(connection).minusSeconds(5));
+        }
+        assertThrows(IllegalStateException.class, () -> service.confirmBooking(id, "Анна", "контакт"));
+        assertEquals("EXPIRED", readStatus(id));
+    }
+
+    @Test
+    void confirmsUsingTheStatusReadAfterAcquiringTheSlotLock() throws Exception {
+        Booking hold = service.createHold(1);
+        ExecutorService worker = Executors.newSingleThreadExecutor();
+        try (Connection blocker = connections.open(); Connection observer = connections.open()) {
+            blocker.setAutoCommit(false);
+            Future<Booking> attempt;
+            try {
+                new PostgresSlotRepository().lockById(blocker, 1).orElseThrow();
+                attempt = worker.submit(() -> service.confirmBooking(hold.getId(), "Борис", "новый контакт"));
+                awaitBlockedCompetitors(observer, backendPid(blocker), 1);
+                Booking confirmed = hold.confirm("Анна", "контакт", bookings.currentTime(blocker));
+                bookings.updateConfirmation(blocker, confirmed);
+                blocker.commit();
+            } finally {
+                blocker.rollback();
+            }
+            ExecutionException error = assertThrows(ExecutionException.class, () -> attempt.get(7, TimeUnit.SECONDS));
+            assertInstanceOf(IllegalStateException.class, error.getCause());
+            Booking saved = service.findById(hold.getId());
+            assertEquals(BookingStatus.CONFIRMED, saved.getStatus());
+            assertEquals("Анна", saved.getCustomerName());
+            assertEquals("контакт", saved.getCustomerContact());
+            assertEquals(1, countBookings());
+        } finally {
+            stopWorkers(worker, List.of());
+        }
+    }
+
+    @Test
+    void persistsExpirationWhenTtlEndsWhileConfirmationWaitsForTheSlotLock() throws Exception {
+        ExecutorService worker = Executors.newSingleThreadExecutor();
+        try (Connection blocker = connections.open(); Connection observer = connections.open()) {
+            Instant expiresAt = bookings.currentTime(observer).plusSeconds(3);
+            UUID id = insertBooking(observer, 1, "HOLD", expiresAt.minusSeconds(600));
+            blocker.setAutoCommit(false);
+            Future<Booking> attempt;
+            try {
+                new PostgresSlotRepository().lockById(blocker, 1).orElseThrow();
+                attempt = worker.submit(() -> service.confirmBooking(id, "Анна", "контакт"));
+                awaitBlockedCompetitors(observer, backendPid(blocker), 1);
+                assertTrue(bookings.currentTime(observer).isBefore(expiresAt));
+                try (var wait = observer.prepareStatement("SELECT pg_sleep_until(?)")) {
+                    wait.setQueryTimeout(5);
+                    wait.setObject(1, expiresAt.atOffset(ZoneOffset.UTC));
+                    wait.execute();
+                }
+            } finally {
+                blocker.rollback();
+            }
+            ExecutionException error = assertThrows(ExecutionException.class, () -> attempt.get(7, TimeUnit.SECONDS));
+            assertInstanceOf(IllegalStateException.class, error.getCause());
+            assertEquals("EXPIRED", readStatus(id));
+            assertEquals(1, countBookings());
+        } finally {
+            stopWorkers(worker, List.of());
+        }
+    }
+
+    @Test
     void rollsBackExpirationAndInsertAfterRealSqlFailure() throws SQLException {
         UUID oldId;
         try (Connection connection = connections.open(); var statement = connection.createStatement()) {
@@ -307,52 +417,79 @@ class BookingServiceIT {
         }
     }
 
-    private List<Integer> awaitBlockedCompetitors(Connection observer, int blockerPid) throws Exception {
+    private Future<Booking> submitHold(ExecutorService workers, CountDownLatch ready, CountDownLatch start, long slotId) {
+        return workers.submit(() -> {
+            ready.countDown();
+            assertTrue(start.await(5, TimeUnit.SECONDS), "Тест не подал сигнал старта.");
+            return service.createHold(slotId);
+        });
+    }
+
+    private int backendPid(Connection connection) throws SQLException {
+        try (var statement = connection.createStatement(); var rows = statement.executeQuery("SELECT pg_backend_pid()")) {
+            assertTrue(rows.next());
+            return rows.getInt(1);
+        }
+    }
+
+    private List<Integer> awaitBlockedCompetitors(Connection observer, int blockerPid, int expected) throws Exception {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
         try (var statement = observer.prepareStatement("""
-                SELECT first_waiter.pid, second_waiter.pid
-                FROM pg_stat_activity first_waiter
-                JOIN pg_stat_activity second_waiter ON first_waiter.pid = ANY(pg_blocking_pids(second_waiter.pid))
-                WHERE first_waiter.datname = current_database() AND second_waiter.datname = current_database()
-                  AND first_waiter.wait_event_type = 'Lock' AND second_waiter.wait_event_type = 'Lock'
-                  AND ? = ANY(pg_blocking_pids(first_waiter.pid))
+                WITH RECURSIVE waiting AS MATERIALIZED (
+                    SELECT pid, pg_blocking_pids(pid) AS blockers
+                    FROM pg_stat_activity
+                    WHERE datname = current_database() AND wait_event_type = 'Lock'
+                ), chain(pid) AS (
+                    SELECT pid FROM waiting WHERE ? = ANY(blockers)
+                    UNION
+                    SELECT waiting.pid FROM waiting JOIN chain ON chain.pid = ANY(waiting.blockers)
+                )
+                SELECT pid FROM chain
                 """)) {
             statement.setQueryTimeout(1);
             statement.setInt(1, blockerPid);
             while (System.nanoTime() < deadline) {
+                List<Integer> workerPids = new ArrayList<>(expected);
                 try (var rows = statement.executeQuery()) {
-                    if (rows.next()) {
-                        return List.of(rows.getInt(1), rows.getInt(2));
+                    while (rows.next()) {
+                        workerPids.add(rows.getInt(1));
                     }
+                }
+                if (workerPids.size() == expected) {
+                    return workerPids;
                 }
                 TimeUnit.MILLISECONDS.sleep(10);
             }
         }
-        return fail("PostgreSQL не подтвердила ожидание блокировок обоими конкурентами.");
+        return fail("PostgreSQL не подтвердила ожидание блокировок для " + expected + " конкурентов.");
     }
 
-    private void assertOnlyWinnerStored(Connection observer, Booking winner) throws SQLException {
+    private void assertHoldsStored(Connection observer, List<Booking> expected) throws SQLException {
         try (var statement = observer.createStatement(); var rows = statement.executeQuery("""
                 SELECT id, slot_id, status, created_at, expires_at, expires_at > clock_timestamp() AS unexpired
                 FROM bookings
+                ORDER BY slot_id
                 """)) {
-            assertTrue(rows.next());
-            assertEquals(winner.getId(), rows.getObject("id", UUID.class));
-            assertEquals(winner.getSlotId(), rows.getLong("slot_id"));
-            assertEquals("HOLD", rows.getString("status"));
-            assertEquals(winner.getCreatedAt(), rows.getObject("created_at", OffsetDateTime.class).toInstant());
-            assertEquals(winner.getExpiresAt(), rows.getObject("expires_at", OffsetDateTime.class).toInstant());
-            assertTrue(rows.getBoolean("unexpired"));
+            for (Booking booking : expected) {
+                assertTrue(rows.next());
+                assertEquals(booking.getId(), rows.getObject("id", UUID.class));
+                assertEquals(booking.getSlotId(), rows.getLong("slot_id"));
+                assertEquals(BookingStatus.HOLD, booking.getStatus());
+                assertEquals(booking.getStatus().name(), rows.getString("status"));
+                assertEquals(booking.getCreatedAt(), rows.getObject("created_at", OffsetDateTime.class).toInstant());
+                assertEquals(booking.getExpiresAt(), rows.getObject("expires_at", OffsetDateTime.class).toInstant());
+                assertTrue(rows.getBoolean("unexpired"));
+            }
             assertFalse(rows.next());
         }
     }
 
     private void awaitClosedCompetitorConnections(Connection observer, List<Integer> workerPids) throws Exception {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
-        try (var statement = observer.prepareStatement("SELECT pid FROM pg_stat_activity WHERE pid IN (?, ?)")) {
+        var pids = observer.createArrayOf("integer", workerPids.toArray());
+        try (var statement = observer.prepareStatement("SELECT pid FROM pg_stat_activity WHERE pid = ANY(?)")) {
             statement.setQueryTimeout(1);
-            statement.setInt(1, workerPids.get(0));
-            statement.setInt(2, workerPids.get(1));
+            statement.setArray(1, pids);
             while (System.nanoTime() < deadline) {
                 try (var rows = statement.executeQuery()) {
                     if (!rows.next()) {
@@ -361,8 +498,18 @@ class BookingServiceIT {
                 }
                 TimeUnit.MILLISECONDS.sleep(10);
             }
+        } finally {
+            pids.free();
         }
-        fail("Соединения обоих конкурентов должны быть закрыты.");
+        fail("Соединения конкурентов должны быть закрыты.");
+    }
+
+    private void stopWorkers(ExecutorService workers, List<Future<Booking>> attempts) throws InterruptedException {
+        for (Future<Booking> result : attempts) {
+            result.cancel(true);
+        }
+        workers.shutdownNow();
+        assertTrue(workers.awaitTermination(7, TimeUnit.SECONDS), "Потоки бронирования не завершились.");
     }
 
     private UUID insertBooking(Connection connection, long slotId, String status, Instant createdAt) throws SQLException {
