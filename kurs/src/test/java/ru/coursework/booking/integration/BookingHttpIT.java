@@ -260,55 +260,55 @@ class BookingHttpIT {
         assertStoredStatus(id, "HOLD");
     }
 
-    @Test
-    void cancelsHoldAndConfirmedBookingAndAllowsEachSlotToBeReused() throws Exception {
+    @ParameterizedTest
+    @EnumSource(value = BookingStatus.class, names = {"HOLD", "CONFIRMED"})
+    void cancelsActiveBookingAndAllowsSlotReuse(BookingStatus initial) throws Exception {
         String body = "{\"slotId\":3000000000}";
         String availableSlots = "/api/v1/resources/1/slots?from=" + futureHour
                 + "&to=" + futureHour.plusSeconds(3600);
         HttpResponse<String> created = post(body);
         assertJsonStatus(created, 201);
         JsonNode active = JSON.readTree(created.body());
-        for (BookingStatus initial : new BookingStatus[]{BookingStatus.HOLD, BookingStatus.CONFIRMED}) {
-            String id = active.get("id").asText();
-            UUID uuid = UUID.fromString(id);
-            if (initial == BookingStatus.CONFIRMED) {
-                HttpResponse<String> confirmed = confirm(uuid, CUSTOMER);
-                assertJsonStatus(confirmed, 200);
-                active = JSON.readTree(confirmed.body());
-            }
-            assertEquals(initial.name(), active.get("status").asText());
-            assertEquals(0, JSON.readTree(get(availableSlots).body()).size());
-
-            HttpResponse<String> response = cancel(id);
-            assertJsonStatus(response, 200);
-            JsonNode cancelled = JSON.readTree(response.body());
-            assertEquals("CANCELLED", cancelled.get("status").asText());
-            for (String field : new String[]{"id", "slotId", "createdAt", "expiresAt",
-                    "customerName", "customerContact", "confirmedAt"}) {
-                assertEquals(active.get(field), cancelled.get(field));
-            }
-            Instant cancelledAt = Instant.parse(cancelled.get("cancelledAt").asText());
-            String previousTime = initial == BookingStatus.HOLD ? "createdAt" : "confirmedAt";
-            assertTrue(!cancelledAt.isBefore(Instant.parse(active.get(previousTime).asText())));
-            assertStoredStatus(uuid, "CANCELLED");
-            assertEquals(cancelled, readBooking(uuid));
-            assertConfirmationConflict(confirm(uuid, CUSTOMER));
-
-            HttpResponse<String> available = get(availableSlots);
-            assertJsonStatus(available, 200);
-            JsonNode slots = JSON.readTree(available.body());
-            assertEquals(1, slots.size());
-            assertEquals(active.get("slotId"), slots.get(0).get("id"));
-            HttpResponse<String> replacement = post(body);
-            assertJsonStatus(replacement, 201);
-            active = JSON.readTree(replacement.body());
-            assertNotEquals(id, active.get("id").asText());
-
-            HttpResponse<String> repeated = cancel(id);
-            assertJsonStatus(repeated, 200);
-            assertEquals(cancelled, JSON.readTree(repeated.body()));
-            assertStoredStatus(UUID.fromString(active.get("id").asText()), "HOLD");
+        UUID id = UUID.fromString(active.get("id").asText());
+        if (initial == BookingStatus.CONFIRMED) {
+            HttpResponse<String> confirmed = confirm(id, CUSTOMER);
+            assertJsonStatus(confirmed, 200);
+            active = JSON.readTree(confirmed.body());
         }
+        assertEquals(initial.name(), active.get("status").asText());
+        HttpResponse<String> unavailable = get(availableSlots);
+        assertJsonStatus(unavailable, 200);
+        assertEquals("[]", unavailable.body());
+
+        HttpResponse<String> response = cancel(id.toString());
+        assertJsonStatus(response, 200);
+        JsonNode cancelled = JSON.readTree(response.body());
+        assertEquals("CANCELLED", cancelled.get("status").asText());
+        for (String field : new String[]{"id", "slotId", "createdAt", "expiresAt",
+                "customerName", "customerContact", "confirmedAt"}) {
+            assertEquals(active.get(field), cancelled.get(field));
+        }
+        Instant cancelledAt = Instant.parse(cancelled.get("cancelledAt").asText());
+        String previousTime = initial == BookingStatus.HOLD ? "createdAt" : "confirmedAt";
+        assertTrue(!cancelledAt.isBefore(Instant.parse(active.get(previousTime).asText())));
+        assertStoredStatus(id, "CANCELLED");
+        assertEquals(cancelled, readBooking(id));
+        assertConfirmationConflict(confirm(id, CUSTOMER));
+
+        HttpResponse<String> available = get(availableSlots);
+        assertJsonStatus(available, 200);
+        JsonNode slots = JSON.readTree(available.body());
+        assertEquals(1, slots.size());
+        assertEquals(active.get("slotId"), slots.get(0).get("id"));
+        HttpResponse<String> replacement = post(body);
+        assertJsonStatus(replacement, 201);
+        UUID replacementId = UUID.fromString(JSON.readTree(replacement.body()).get("id").asText());
+        assertNotEquals(id, replacementId);
+
+        HttpResponse<String> repeated = cancel(id.toString());
+        assertJsonStatus(repeated, 200);
+        assertEquals(cancelled, JSON.readTree(repeated.body()));
+        assertStoredStatus(replacementId, "HOLD");
     }
 
     @ParameterizedTest

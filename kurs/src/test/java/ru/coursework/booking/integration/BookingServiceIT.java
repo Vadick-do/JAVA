@@ -334,8 +334,9 @@ class BookingServiceIT {
         }
     }
 
-    @Test
-    void persistsExpirationWhenTtlEndsWhileConfirmationWaitsForTheSlotLock() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void persistsExpirationWhenTtlEndsWhileTheTransitionWaitsForTheSlotLock(boolean cancel) throws Exception {
         ExecutorService worker = Executors.newSingleThreadExecutor();
         try (Connection blocker = connections.open(); Connection observer = connections.open()) {
             Instant expiresAt = bookings.currentTime(observer).plusSeconds(3);
@@ -344,7 +345,8 @@ class BookingServiceIT {
             Future<Booking> attempt;
             try {
                 new PostgresSlotRepository().lockById(blocker, 1).orElseThrow();
-                attempt = worker.submit(() -> service.confirmBooking(id, "Анна", "контакт"));
+                attempt = worker.submit(() -> cancel ? service.cancelBooking(id)
+                        : service.confirmBooking(id, "Анна", "контакт"));
                 awaitBlockedCompetitors(observer, backendPid(blocker), 1);
                 assertTrue(bookings.currentTime(observer).isBefore(expiresAt));
                 try (var wait = observer.prepareStatement("SELECT pg_sleep_until(?)")) {
@@ -355,9 +357,46 @@ class BookingServiceIT {
             } finally {
                 blocker.rollback();
             }
-            ExecutionException error = assertThrows(ExecutionException.class, () -> attempt.get(7, TimeUnit.SECONDS));
-            assertInstanceOf(IllegalStateException.class, error.getCause());
+            if (cancel) {
+                Booking expired = attempt.get(7, TimeUnit.SECONDS);
+                assertEquals(BookingStatus.EXPIRED, expired.getStatus());
+                assertNull(expired.getCancelledAt());
+            } else {
+                ExecutionException error = assertThrows(ExecutionException.class, () -> attempt.get(7, TimeUnit.SECONDS));
+                assertInstanceOf(IllegalStateException.class, error.getCause());
+            }
             assertEquals("EXPIRED", readStatus(id));
+            assertEquals(1, countBookings());
+        } finally {
+            stopWorkers(worker, List.of());
+        }
+    }
+
+    @Test
+    void cancelsUsingConfirmationCommittedWhileWaitingForTheSlotLock() throws Exception {
+        Booking hold = service.createHold(1);
+        ExecutorService worker = Executors.newSingleThreadExecutor();
+        try (Connection blocker = connections.open(); Connection observer = connections.open()) {
+            blocker.setAutoCommit(false);
+            Future<Booking> attempt;
+            Booking confirmed;
+            try {
+                new PostgresSlotRepository().lockById(blocker, 1).orElseThrow();
+                attempt = worker.submit(() -> service.cancelBooking(hold.getId()));
+                awaitBlockedCompetitors(observer, backendPid(blocker), 1);
+                confirmed = hold.confirm("Анна", "контакт", bookings.currentTime(blocker));
+                bookings.updateConfirmation(blocker, confirmed);
+                blocker.commit();
+            } finally {
+                blocker.rollback();
+            }
+            Booking cancelled = attempt.get(7, TimeUnit.SECONDS);
+            assertEquals(BookingStatus.CANCELLED, cancelled.getStatus());
+            assertEquals(confirmed.getConfirmedAt(), cancelled.getConfirmedAt());
+            assertEquals(confirmed.getCustomerName(), cancelled.getCustomerName());
+            assertEquals(confirmed.getCustomerContact(), cancelled.getCustomerContact());
+            assertTrue(!cancelled.getCancelledAt().isBefore(confirmed.getConfirmedAt()));
+            assertEquals("CANCELLED", readStatus(hold.getId()));
             assertEquals(1, countBookings());
         } finally {
             stopWorkers(worker, List.of());
