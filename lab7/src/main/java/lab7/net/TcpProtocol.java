@@ -1,10 +1,23 @@
 package lab7.net;
 
+import lab7.model.Camera;
+import lab7.model.FileReadResult;
+import lab7.model.Image;
+import lab7.model.PhotoCamera;
+import lab7.model.Smartphone;
+import lab7.model.WebCamera;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
+import java.io.ObjectInputFilter;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Set;
 
 public class TcpProtocol {
     public static final String PING = "PING";
@@ -26,42 +39,60 @@ public class TcpProtocol {
     public static final String RESET = "RESET";
     public static final String DEFAULT_FILE = "devices.txt";
     public static final String OK = "OK";
-    public static final String ERROR = "ERROR ";
     public static final String PONG = OK + " PONG";
-    public static final String UNKNOWN_COMMAND = ERROR + "Неизвестная команда.";
     public static final int TIMEOUT_MS = 5000;
-    public static final int MAX_MESSAGE_BYTES = 1024 * 1024;
-    public static final int MTU_BYTES = 1500;
-    private static final int IPV4_HEADER_BYTES = 20;
-    private static final int TCP_HEADER_BYTES = 20;
-    public static final int BLOCK_BYTES = MTU_BYTES - IPV4_HEADER_BYTES - TCP_HEADER_BYTES;
+    private static final int MAX_MESSAGE_BYTES = 1024 * 1024;
+    private static final Set<Class<?>> REQUEST_TYPES = Set.of(CameraRequest.class, String[].class);
+    private static final Set<Class<?>> RESPONSE_TYPES = Set.of(
+            CameraResponse.class, Camera[].class, Camera.class, WebCamera.class, PhotoCamera.class,
+            Smartphone.class, Image.class, FileReadResult.class, ArrayList.class, Object[].class,
+            Integer.class, Number.class);
 
-    public static String readMessage(DataInputStream input) throws IOException {
+    public static <T> T readMessage(DataInputStream input, Class<T> type) throws IOException {
         int length = input.readInt();
-        checkLength(length);
-        byte[] bytes = new byte[length];
-        input.readFully(bytes);
-        return StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(bytes)).toString();
-    }
-
-    public static void writeMessage(DataOutputStream output, String message) throws IOException {
-        byte[] bytes = message.getBytes(StandardCharsets.UTF_8);
-        checkLength(bytes.length);
-        output.writeInt(bytes.length);
-        int offset = 0;
-        int available = BLOCK_BYTES - Integer.BYTES;
-        while (offset < bytes.length) {
-            int count = Math.min(available, bytes.length - offset);
-            output.write(bytes, offset, count);
-            output.flush();
-            offset += count;
-            available = BLOCK_BYTES;
-        }
-    }
-
-    private static void checkLength(int length) throws IOException {
         if (length < 1 || length > MAX_MESSAGE_BYTES) {
             throw new IOException("Недопустимая длина сообщения: " + length);
         }
+        byte[] bytes = new byte[length];
+        input.readFully(bytes);
+        Set<Class<?>> allowedTypes = type == CameraRequest.class ? REQUEST_TYPES : RESPONSE_TYPES;
+        try (ObjectInputStream objects = new ObjectInputStream(new ByteArrayInputStream(bytes))) {
+            objects.setObjectInputFilter(info -> filter(info, allowedTypes));
+            Object message = objects.readObject();
+            if (!type.isInstance(message)) {
+                throw new IOException("Неожиданный тип сообщения.");
+            }
+            return type.cast(message);
+        } catch (ClassNotFoundException e) {
+            throw new IOException("Неизвестный класс сообщения.", e);
+        }
+    }
+
+    public static byte[] serialize(Serializable message) throws IOException {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try (ObjectOutputStream objects = new ObjectOutputStream(bytes)) {
+            objects.writeObject(message);
+        }
+        if (bytes.size() > MAX_MESSAGE_BYTES) {
+            throw new IOException("Сообщение слишком большое.");
+        }
+        return bytes.toByteArray();
+    }
+
+    public static void writeMessage(DataOutputStream output, byte[] bytes) throws IOException {
+        output.writeInt(bytes.length);
+        output.write(bytes);
+        output.flush();
+    }
+
+    private static ObjectInputFilter.Status filter(ObjectInputFilter.FilterInfo info, Set<Class<?>> allowedTypes) {
+        if (info.depth() > 12 || info.arrayLength() > MAX_MESSAGE_BYTES / Integer.BYTES) {
+            return ObjectInputFilter.Status.REJECTED;
+        }
+        Class<?> type = info.serialClass();
+        if (type == null) {
+            return ObjectInputFilter.Status.UNDECIDED;
+        }
+        return allowedTypes.contains(type) ? ObjectInputFilter.Status.ALLOWED : ObjectInputFilter.Status.REJECTED;
     }
 }

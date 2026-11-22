@@ -1,4 +1,4 @@
-lab7/client/CameraReply.class
+lab7/net/CameraResponse.class
 lab7/server/TcpServer.class
 lab7/client/controller/CameraController.class
 lab7/server/io/CamerasCsvWriter.class
@@ -10,9 +10,9 @@ lab7/model/PhotoCamera.class
 lab7/model/Camera.class
 lab7/server/CameraRequests.class
 lab7/server/io/CamerasFileReader.class
-lab7/server/CameraResponse.class
 lab7/client/CameraClient.class
 lab7/model/Smartphone.class
+lab7/net/CameraRequest.class
 lab7/lab7.class
 lab7/model/Image.class
 lab7/server/CameraServer.class

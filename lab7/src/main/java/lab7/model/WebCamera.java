@@ -3,6 +3,8 @@ package lab7.model;
 import java.util.Random;
 
 public class WebCamera extends Camera {
+    private static final long serialVersionUID = 1L;
+
     public static final String TYPE = "WebCamera";
     public static final double MIN_WIDTH = 320.0;
     public static final double MAX_WIDTH = 3840.0;

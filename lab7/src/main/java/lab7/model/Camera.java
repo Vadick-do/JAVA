@@ -1,9 +1,12 @@
 package lab7.model;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-public abstract class Camera {
+public abstract class Camera implements Serializable {
+    private static final long serialVersionUID = 1L;
+
     public static final String PHOTO_MODE = "фото";
     public static final String VIDEO_MODE = "видео";
     public static final int MAX_VIDEO_SECONDS = 86400;

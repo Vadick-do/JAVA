@@ -1,9 +1,12 @@
 package lab7.model;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-public class FileReadResult {
+public class FileReadResult implements Serializable {
+    private static final long serialVersionUID = 1L;
+
     private final List<Camera> cams;
     private final List<String> warnings;
     private final int objectCount;

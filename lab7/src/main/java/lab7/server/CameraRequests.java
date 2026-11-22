@@ -5,10 +5,13 @@ import lab7.model.FileReadResult;
 import lab7.model.PhotoCamera;
 import lab7.model.Smartphone;
 import lab7.model.WebCamera;
+import lab7.net.CameraRequest;
+import lab7.net.CameraResponse;
 import lab7.net.TcpProtocol;
 import lab7.server.io.CamerasCsvWriter;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -30,69 +33,78 @@ class CameraRequests {
         server.loadCameras(sourceFile(TcpProtocol.DEFAULT_FILE).toString());
     }
 
-    synchronized String handle(String request) {
-        String[] args = request.split("\n", 6);
+    synchronized byte[] handle(CameraRequest request) throws IOException {
+        String command = request.command();
+        String[] args = request.arguments();
         try {
-            switch (args[0]) {
+            switch (command) {
                 case TcpProtocol.PING:
-                    requireLength(args, 1);
-                    return TcpProtocol.PONG;
+                    requireLength(args, 0);
+                    return response(TcpProtocol.PONG);
                 case TcpProtocol.LIST:
-                    requireLength(args, 1);
-                    return CameraResponse.cameras(server.getCameras());
+                    requireLength(args, 0);
+                    return response(server.getCameras().toArray(Camera[]::new));
                 case TcpProtocol.GET:
-                    requireLength(args, 2);
+                    requireLength(args, 1);
                     List<Camera> cameras = server.getCameras();
-                    return CameraResponse.cameras(List.of(cameras.get(cameraIndex(cameras, args[1]))));
+                    return response(cameras.get(cameraIndex(cameras, args[0])));
                 case TcpProtocol.READ:
                 case TcpProtocol.LOAD:
-                    return readFile(args, TcpProtocol.LOAD.equals(args[0]));
+                    return readFile(args, TcpProtocol.LOAD.equals(command));
                 case TcpProtocol.REPLACE:
-                    requireLength(args, 3);
-                    replaceFile(args[1], args[2]);
-                    return TcpProtocol.OK;
+                    requireLength(args, 2);
+                    replaceFile(args[0], args[1]);
+                    return response(TcpProtocol.OK);
                 case TcpProtocol.LOG:
-                    requireLength(args, 3);
-                    return logFile(args[1], args[2]);
+                    requireLength(args, 2);
+                    return response(logFile(args[0], args[1]));
                 case TcpProtocol.ADD:
-                    requireLength(args, 5);
-                    addCamera(args[1], args[2], args[3], args[4]);
-                    return TcpProtocol.OK;
+                    requireLength(args, 4);
+                    addCamera(args[0], args[1], args[2], args[3]);
+                    return response(TcpProtocol.OK);
                 case TcpProtocol.EDIT:
-                    requireLength(args, 5);
-                    editCamera(args[1], args[2], args[3], args[4]);
-                    return TcpProtocol.OK;
+                    requireLength(args, 4);
+                    editCamera(args[0], args[1], args[2], args[3]);
+                    return response(TcpProtocol.OK);
                 case TcpProtocol.VIDEO:
                 case TcpProtocol.ZOOM:
-                    requireLength(args, 3);
-                    changeCamera(args[0], args[1], args[2]);
-                    return TcpProtocol.OK;
+                    requireLength(args, 2);
+                    changeCamera(command, args[0], args[1]);
+                    return response(TcpProtocol.OK);
                 case TcpProtocol.DELETE:
                 case TcpProtocol.PHOTO:
                 case TcpProtocol.MODE:
                 case TcpProtocol.RANDOMIZE:
                 case TcpProtocol.TOGGLE:
                 case TcpProtocol.RESET:
-                    requireLength(args, 2);
-                    changeCamera(args[0], args[1], "");
-                    return TcpProtocol.OK;
+                    requireLength(args, 1);
+                    changeCamera(command, args[0], "");
+                    return response(TcpProtocol.OK);
                 default:
-                    return TcpProtocol.UNKNOWN_COMMAND;
+                    return error("Неизвестная команда.");
             }
         } catch (NumberFormatException e) {
-            return TcpProtocol.ERROR + "Неверный формат числа.";
+            return error("Неверный формат числа.");
         } catch (IllegalArgumentException | IllegalStateException | IOException e) {
-            return TcpProtocol.ERROR + e.getMessage();
+            return error(e.getMessage());
         }
     }
 
-    private String readFile(String[] args, boolean load) throws IOException {
-        if (args.length > 2) {
+    private byte[] response(Serializable value) throws IOException {
+        return TcpProtocol.serialize(new CameraResponse(value));
+    }
+
+    private byte[] error(String message) throws IOException {
+        return TcpProtocol.serialize(CameraResponse.failure(message));
+    }
+
+    private byte[] readFile(String[] args, boolean load) throws IOException {
+        if (args.length > 1) {
             throw new IllegalArgumentException("Неверное число аргументов.");
         }
-        String name = args.length == 1 ? TcpProtocol.DEFAULT_FILE : args[1];
+        String name = args.length == 0 ? TcpProtocol.DEFAULT_FILE : args[0];
         FileReadResult result = server.readCameras(sourceFile(name).toString());
-        String response = CameraResponse.report(result);
+        byte[] response = response(result);
         if (load) {
             server.addCameras(result.getCams());
         }
@@ -139,7 +151,7 @@ class CameraRequests {
         }
     }
 
-    private String logFile(String sourceName, String csvName) throws IOException {
+    private int logFile(String sourceName, String csvName) throws IOException {
         Path source = sourceFile(sourceName);
         Path csv = dataFile(csvName, ".csv");
         if (Files.exists(csv) && Files.isSameFile(source, csv)) {
@@ -151,7 +163,7 @@ class CameraRequests {
             journal = new CamerasCsvWriter(csv.toString());
             journals.put(csv, journal);
         }
-        return TcpProtocol.OK + "\n" + journal.writeChanges(result.getCams());
+        return journal.writeChanges(result.getCams());
     }
 
     private void addCamera(String type, String model, String first, String second) {

@@ -1,8 +1,11 @@
 package lab7.model;
 
+import java.io.Serializable;
 import java.util.Locale;
 
-public class Image {
+public class Image implements Serializable {
+    private static final long serialVersionUID = 1L;
+
     private String fileName;
     private String resolution;
     private double sizeMb;

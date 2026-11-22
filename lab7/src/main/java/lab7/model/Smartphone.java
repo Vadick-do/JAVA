@@ -3,6 +3,8 @@ package lab7.model;
 import java.util.Random;
 
 public class Smartphone extends Camera {
+    private static final long serialVersionUID = 1L;
+
     public static final String TYPE = "Smartphone";
     public static final double MIN_MEGAPIXELS = 2.0;
     public static final double MAX_MEGAPIXELS = 200.0;

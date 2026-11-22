@@ -1,5 +1,4 @@
 /Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/client/CameraClient.java
-/Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/client/CameraReply.java
 /Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/client/TcpClient.java
 /Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/client/controller/CameraController.java
 /Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/client/view/CommandLineOptions.java
@@ -11,10 +10,11 @@
 /Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/model/PhotoCamera.java
 /Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/model/Smartphone.java
 /Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/model/WebCamera.java
+/Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/net/CameraRequest.java
+/Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/net/CameraResponse.java
 /Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/net/NetworkSettings.java
 /Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/net/TcpProtocol.java
 /Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/server/CameraRequests.java
-/Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/server/CameraResponse.java
 /Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/server/CameraServer.java
 /Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/server/TcpServer.java
 /Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/server/io/CamerasCsvWriter.java

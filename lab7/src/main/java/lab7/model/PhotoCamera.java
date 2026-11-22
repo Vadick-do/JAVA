@@ -3,6 +3,8 @@ package lab7.model;
 import java.util.Random;
 
 public class PhotoCamera extends Camera {
+    private static final long serialVersionUID = 1L;
+
     public static final String TYPE = "PhotoCamera";
     public static final int MIN_ISO = 100;
     public static final int MAX_ISO = 6400;

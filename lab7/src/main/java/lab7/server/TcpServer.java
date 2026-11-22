@@ -1,5 +1,6 @@
 package lab7.server;
 
+import lab7.net.CameraRequest;
 import lab7.net.NetworkSettings;
 import lab7.net.TcpProtocol;
 
@@ -51,8 +52,8 @@ public class TcpServer {
     private static void handleRequest(Socket socket, CameraRequests requests) throws IOException {
         socket.setSoTimeout(TcpProtocol.TIMEOUT_MS);
         DataInputStream input = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
-        DataOutputStream output = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream(), TcpProtocol.BLOCK_BYTES));
-        String request = TcpProtocol.readMessage(input);
+        DataOutputStream output = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
+        CameraRequest request = TcpProtocol.readMessage(input, CameraRequest.class);
         TcpProtocol.writeMessage(output, requests.handle(request));
     }
 }
