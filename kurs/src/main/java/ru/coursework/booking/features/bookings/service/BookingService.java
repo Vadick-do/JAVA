@@ -6,16 +6,20 @@ import ru.coursework.booking.core.domain.Resource;
 import ru.coursework.booking.core.domain.Slot;
 import ru.coursework.booking.core.repository.postgres.ConnectionFactory;
 import ru.coursework.booking.features.bookings.repository.BookingRepository;
+import ru.coursework.booking.features.bookings.repository.BookingRepository.ExpiredHoldCandidate;
 import ru.coursework.booking.features.resources.repository.ResourceRepository;
 import ru.coursework.booking.features.slots.repository.SlotRepository;
 
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
 public final class BookingService {
+    private static final int EXPIRATION_BATCH_SIZE = 100;
+
     private final ConnectionFactory connections;
     private final ResourceRepository resources;
     private final SlotRepository slots;
@@ -126,6 +130,43 @@ public final class BookingService {
         try (Connection connection = connections.open()) {
             Booking booking = requireBooking(connection, id);
             return booking.expire(bookings.currentTime(connection));
+        }
+    }
+
+    public int expirePendingHolds() throws SQLException {
+        List<ExpiredHoldCandidate> candidates;
+        try (Connection connection = connections.open()) {
+            candidates = bookings.findExpiredHoldCandidates(connection, EXPIRATION_BATCH_SIZE);
+        }
+        int expiredCount = 0;
+        for (ExpiredHoldCandidate candidate : candidates) {
+            if (expireHold(candidate)) {
+                expiredCount++;
+            }
+        }
+        return expiredCount;
+    }
+
+    private boolean expireHold(ExpiredHoldCandidate candidate) throws SQLException {
+        try (Connection connection = connections.open()) {
+            connection.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
+            connection.setAutoCommit(false);
+            try {
+                boolean expired = false;
+                if (slots.lockById(connection, candidate.slotId()).isPresent()) {
+                    Booking booking = bookings.findById(connection, candidate.id()).orElse(null);
+                    if (booking != null && booking.getSlotId() == candidate.slotId()) {
+                        Instant now = bookings.currentTime(connection);
+                        expired = booking.expire(now) != booking
+                                && bookings.expireHolds(connection, candidate.slotId(), now) == 1;
+                    }
+                }
+                connection.commit();
+                return expired;
+            } catch (SQLException | RuntimeException error) {
+                rollback(connection, error);
+                throw error;
+            }
         }
     }
 

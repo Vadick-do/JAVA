@@ -11,6 +11,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import ru.coursework.booking.core.config.AppConfig;
 import ru.coursework.booking.core.domain.Booking;
 import ru.coursework.booking.core.domain.BookingStatus;
+import ru.coursework.booking.core.domain.Slot;
 import ru.coursework.booking.core.repository.postgres.ConnectionFactory;
 import ru.coursework.booking.core.repository.postgres.MigrationRunner;
 import ru.coursework.booking.features.bookings.repository.BookingRepository;
@@ -453,6 +454,91 @@ class BookingServiceIT {
                 connection.rollback();
             }
             assertEquals(expected, readStatus(id));
+        }
+    }
+
+    @Test
+    void cleanupExpiresOnlyOverdueHoldsAndCanBeRepeated() throws SQLException {
+        assertEquals(0, service.expirePendingHolds());
+        UUID overdue;
+        UUID valid;
+        UUID started;
+        UUID confirmed;
+        UUID cancelled;
+        try (Connection connection = connections.open()) {
+            Instant now = bookings.currentTime(connection);
+            overdue = insertBooking(connection, 1, "HOLD", now.minusSeconds(660));
+            valid = insertBooking(connection, 2, "HOLD", now.minusSeconds(5));
+            started = insertBooking(connection, 4, "HOLD", now.minusSeconds(5));
+            confirmed = insertBooking(connection, 5, "CONFIRMED", now.minus(Duration.ofDays(2)));
+            cancelled = insertBooking(connection, 6, "CANCELLED", now.minusSeconds(660));
+        }
+
+        assertEquals(2, service.expirePendingHolds());
+        assertEquals("EXPIRED", readStatus(overdue));
+        assertEquals("HOLD", readStatus(valid));
+        assertEquals("EXPIRED", readStatus(started));
+        assertEquals("CONFIRMED", readStatus(confirmed));
+        assertEquals("CANCELLED", readStatus(cancelled));
+        assertEquals(0, service.expirePendingHolds());
+        assertEquals(5, countBookings());
+    }
+
+    @Test
+    void cleanupProcessesAtMostOneBatchPerPass() throws SQLException {
+        try (Connection connection = connections.open(); var statement = connection.createStatement()) {
+            int inserted = statement.executeUpdate("""
+                    WITH inserted_slots AS (
+                        INSERT INTO slots (id, resource_id, starts_at, ends_at)
+                        SELECT n, 7, starts_at, starts_at + INTERVAL '1 hour'
+                        FROM (
+                            SELECT n, date_trunc('hour', statement_timestamp(), 'UTC') + n * INTERVAL '1 hour' AS starts_at
+                            FROM generate_series(100, 200) AS series(n)
+                        ) AS times
+                        RETURNING id
+                    )
+                    INSERT INTO bookings (id, slot_id, status, created_at, expires_at)
+                    SELECT gen_random_uuid(), id, 'HOLD',
+                           statement_timestamp() - INTERVAL '11 minutes',
+                           statement_timestamp() - INTERVAL '1 minute'
+                    FROM inserted_slots
+                    """);
+            assertEquals(101, inserted);
+        }
+
+        assertEquals(100, service.expirePendingHolds());
+        assertEquals(1, service.expirePendingHolds());
+        assertEquals(0, service.expirePendingHolds());
+        assertEquals(101, countBookings());
+    }
+
+    @Test
+    void cleanupSkipsAStaleCandidateAfterAcquiringTheSlotLock() throws Exception {
+        ExecutorService worker = Executors.newSingleThreadExecutor();
+        try (Connection blocker = connections.open(); Connection observer = connections.open()) {
+            UUID oldId = insertBooking(observer, 1, "HOLD", bookings.currentTime(observer).minusSeconds(660));
+            blocker.setAutoCommit(false);
+            Booking replacement;
+            Future<Integer> attempt;
+            try {
+                Slot slot = new PostgresSlotRepository().lockById(blocker, 1).orElseThrow();
+                attempt = worker.submit(service::expirePendingHolds);
+                awaitBlockedCompetitors(observer, backendPid(blocker), 1);
+
+                Instant now = bookings.currentTime(blocker);
+                assertEquals(1, bookings.expireHolds(blocker, slot.getId(), now));
+                replacement = Booking.hold(UUID.randomUUID(), slot, now);
+                bookings.insertHold(blocker, replacement);
+                blocker.commit();
+            } finally {
+                blocker.rollback();
+            }
+            assertEquals(0, attempt.get(7, TimeUnit.SECONDS).intValue());
+            assertEquals("EXPIRED", readStatus(oldId));
+            assertEquals("HOLD", readStatus(replacement.getId()));
+            assertEquals(2, countBookings());
+        } finally {
+            stopWorkers(worker, List.of());
         }
     }
 

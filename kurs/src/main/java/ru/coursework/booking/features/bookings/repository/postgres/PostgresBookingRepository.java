@@ -12,6 +12,8 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -48,7 +50,30 @@ public final class PostgresBookingRepository implements BookingRepository {
     }
 
     @Override
-    public void expireHolds(Connection connection, long slotId, Instant now) throws SQLException {
+    public List<ExpiredHoldCandidate> findExpiredHoldCandidates(Connection connection, int limit) throws SQLException {
+        String sql = """
+                SELECT b.id, b.slot_id
+                FROM bookings b JOIN slots s ON s.id = b.slot_id
+                WHERE b.status = 'HOLD'
+                  AND (b.expires_at <= statement_timestamp() OR s.starts_at <= statement_timestamp())
+                ORDER BY b.expires_at, b.id
+                LIMIT ?
+                """;
+        List<ExpiredHoldCandidate> candidates = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setQueryTimeout(5);
+            statement.setInt(1, limit);
+            try (ResultSet rows = statement.executeQuery()) {
+                while (rows.next()) {
+                    candidates.add(new ExpiredHoldCandidate(rows.getObject("id", UUID.class), rows.getLong("slot_id")));
+                }
+            }
+        }
+        return candidates;
+    }
+
+    @Override
+    public int expireHolds(Connection connection, long slotId, Instant now) throws SQLException {
         String sql = """
                 UPDATE bookings b SET status = 'EXPIRED'
                 FROM slots s
@@ -60,7 +85,7 @@ public final class PostgresBookingRepository implements BookingRepository {
             statement.setLong(1, slotId);
             statement.setObject(2, now.atOffset(ZoneOffset.UTC));
             statement.setObject(3, now.atOffset(ZoneOffset.UTC));
-            statement.executeUpdate();
+            return statement.executeUpdate();
         }
     }
 
