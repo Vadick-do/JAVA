@@ -6,6 +6,7 @@ import lab7.model.Image;
 import lab7.model.PhotoCamera;
 import lab7.model.Smartphone;
 import lab7.model.WebCamera;
+import lab7.net.LogResult;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -161,7 +162,7 @@ public class ConsoleView {
         System.out.println("2. Добавить устройство");
         System.out.println("3. Изменить свойства устройства");
         System.out.println("4. Удалить устройство");
-        System.out.println("5. Функциональная работа с устройством");
+        System.out.println("5. Выбрать устройство для работы");
         System.out.println("6. Сделать фото на все устройства сразу");
         System.out.println("7. Прочитать данные из файла (текущий: " + dataFileName + ")");
         System.out.println("8. Изменить название файла с данными");
@@ -197,7 +198,7 @@ public class ConsoleView {
             specialActionText = "Включить/выключить ночной режим (сейчас: " + (sp.isNightMode() ? "вкл" : "выкл") + ")";
         }
 
-        System.out.println("\n--- Работа с устройством [" + cam.getModel() + "] ---");
+        System.out.println("\n--- Работа с устройством [ID: " + cam.getId() + "] " + cam.getModel() + " ---");
         System.out.println("0. Назад в главное меню");
         System.out.println("1. Сделать фото");
         System.out.println("2. Записать видео");
@@ -278,6 +279,11 @@ public class ConsoleView {
         System.out.println("Успешно прочитано свойств:      " + result.getPropertiesRead());
         System.out.println("Не найдено (пропущено) свойств: " + result.getPropertiesMissing());
         System.out.println("==========================================");
+    }
+
+    public void showLogResult(LogResult result) {
+        printReport(result.report());
+        showMessage("Записано значений в CSV: " + result.changes());
     }
 
     public String readString(String msg) {

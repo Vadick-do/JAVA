@@ -194,9 +194,8 @@ public class CameraController {
         }
 
         int index = view.readCameraIndex(cams, "\nВыберите номер устройства для работы: ");
-
-        Camera cam = cams.get(index);
-        int id = cam.getId();
+        int id = cams.get(index).getId();
+        Camera cam = client.getCamera(id);
         boolean inDeviceMenu = true;
 
         while (inDeviceMenu) {
@@ -245,7 +244,9 @@ public class CameraController {
                         view.printImages(cam);
                         break;
                     case "8":
-                        client.execute(TcpProtocol.RESET, id);
+                        if (!(cam instanceof WebCamera)) {
+                            client.execute(TcpProtocol.RESET, id);
+                        }
                         cam = client.getCamera(id);
                         view.showDeviceReset(cam);
                         break;
@@ -326,8 +327,7 @@ public class CameraController {
         view.showLogStart(fileName, csvFileName, interval);
         while (!Thread.currentThread().isInterrupted()) {
             try {
-                int changes = client.logCameras(fileName, csvFileName);
-                view.showMessage("Записано значений в CSV: " + changes);
+                view.showLogResult(client.logCameras(fileName, csvFileName));
             } catch (IOException e) {
                 view.showMessage("Ошибка ввода-вывода при записи журнала: " + e.getMessage());
             }

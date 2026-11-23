@@ -46,7 +46,7 @@ public class TcpProtocol {
     private static final Set<Class<?>> RESPONSE_TYPES = Set.of(
             CameraResponse.class, Camera[].class, Camera.class, WebCamera.class, PhotoCamera.class,
             Smartphone.class, Image.class, FileReadResult.class, ArrayList.class, Object[].class,
-            Integer.class, Number.class);
+            LogResult.class);
 
     public static <T> T readMessage(DataInputStream input, Class<T> type) throws IOException {
         int length = input.readInt();

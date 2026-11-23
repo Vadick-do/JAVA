@@ -3,6 +3,7 @@ package lab7.client;
 import lab7.model.Camera;
 import lab7.model.FileReadResult;
 import lab7.net.CameraRequest;
+import lab7.net.LogResult;
 import lab7.net.NetworkSettings;
 import lab7.net.TcpProtocol;
 
@@ -32,12 +33,12 @@ public class CameraClient {
         return request(TcpProtocol.LOAD, FileReadResult.class, fileName);
     }
 
-    public int logCameras(String fileName, String csvFileName) throws IOException {
-        int changes = request(TcpProtocol.LOG, Integer.class, fileName, csvFileName);
-        if (changes < 0) {
+    public LogResult logCameras(String fileName, String csvFileName) throws IOException {
+        LogResult result = request(TcpProtocol.LOG, LogResult.class, fileName, csvFileName);
+        if (result.report() == null || result.changes() < 0) {
             throw new IOException("Некорректный ответ сервера.");
         }
-        return changes;
+        return result;
     }
 
     public void execute(String command, Object... arguments) throws IOException {

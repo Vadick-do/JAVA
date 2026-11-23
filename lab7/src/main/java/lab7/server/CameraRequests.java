@@ -7,6 +7,7 @@ import lab7.model.Smartphone;
 import lab7.model.WebCamera;
 import lab7.net.CameraRequest;
 import lab7.net.CameraResponse;
+import lab7.net.LogResult;
 import lab7.net.TcpProtocol;
 import lab7.server.io.CamerasCsvWriter;
 
@@ -151,7 +152,7 @@ class CameraRequests {
         }
     }
 
-    private int logFile(String sourceName, String csvName) throws IOException {
+    private LogResult logFile(String sourceName, String csvName) throws IOException {
         Path source = sourceFile(sourceName);
         Path csv = dataFile(csvName, ".csv");
         if (Files.exists(csv) && Files.isSameFile(source, csv)) {
@@ -163,7 +164,8 @@ class CameraRequests {
             journal = new CamerasCsvWriter(csv.toString());
             journals.put(csv, journal);
         }
-        return journal.writeChanges(result.getCams());
+        int changes = journal.writeChanges(result.getCams());
+        return new LogResult(result, changes);
     }
 
     private void addCamera(String type, String model, String first, String second) {

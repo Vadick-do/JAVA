@@ -5,6 +5,7 @@ lab7/server/io/CamerasCsvWriter.class
 lab7/net/TcpProtocol.class
 lab7/model/WebCamera.class
 lab7/server/io/CamerasFileManager.class
+lab7/net/LogResult.class
 lab7/net/NetworkSettings.class
 lab7/model/PhotoCamera.class
 lab7/model/Camera.class

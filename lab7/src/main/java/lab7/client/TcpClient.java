@@ -5,6 +5,7 @@ import lab7.model.Camera;
 import lab7.model.FileReadResult;
 import lab7.net.CameraRequest;
 import lab7.net.CameraResponse;
+import lab7.net.LogResult;
 import lab7.net.NetworkSettings;
 import lab7.net.TcpProtocol;
 
@@ -71,8 +72,8 @@ public class TcpClient {
             } else if (response instanceof FileReadResult report) {
                 view.printCameras(report.getCams());
                 view.printReport(report);
-            } else if (response instanceof Integer changes) {
-                System.out.println(changes);
+            } else if (response instanceof LogResult log) {
+                view.showLogResult(log);
             } else {
                 throw new IOException("Некорректный ответ сервера.");
             }
