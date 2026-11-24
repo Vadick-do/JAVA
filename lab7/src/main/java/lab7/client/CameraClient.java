@@ -35,7 +35,7 @@ public class CameraClient {
 
     public LogResult logCameras(String fileName, String csvFileName) throws IOException {
         LogResult result = request(TcpProtocol.LOG, LogResult.class, fileName, csvFileName);
-        if (result.report() == null || result.changes() < 0) {
+        if (result.warnings() == null || result.changes() < 0) {
             throw new IOException("Некорректный ответ сервера.");
         }
         return result;

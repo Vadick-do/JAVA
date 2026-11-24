@@ -271,19 +271,23 @@ public class ConsoleView {
     }
 
     public void printReport(FileReadResult result) {
-        for (String warning : result.getWarnings()) {
-            showMessage(warning);
-        }
-        System.out.println("\n========== ОТЧЕТ О ЧТЕНИИ ФАЙЛА ==========");
-        System.out.println("Найдено и воссоздано объектов: " + result.getObjectCount());
-        System.out.println("Успешно прочитано свойств:      " + result.getPropertiesRead());
-        System.out.println("Не найдено (пропущено) свойств: " + result.getPropertiesMissing());
-        System.out.println("==========================================");
+        printReport(result.getObjectCount(), result.getPropertiesRead(), result.getPropertiesMissing(), result.getWarnings());
     }
 
     public void showLogResult(LogResult result) {
-        printReport(result.report());
+        printReport(result.objectCount(), result.propertiesRead(), result.propertiesMissing(), List.of(result.warnings()));
         showMessage("Записано значений в CSV: " + result.changes());
+    }
+
+    private void printReport(int objectCount, int propertiesRead, int propertiesMissing, List<String> warnings) {
+        for (String warning : warnings) {
+            showMessage(warning);
+        }
+        System.out.println("\n========== ОТЧЕТ О ЧТЕНИИ ФАЙЛА ==========");
+        System.out.println("Найдено и воссоздано объектов: " + objectCount);
+        System.out.println("Успешно прочитано свойств:      " + propertiesRead);
+        System.out.println("Не найдено (пропущено) свойств: " + propertiesMissing);
+        System.out.println("==========================================");
     }
 
     public String readString(String msg) {

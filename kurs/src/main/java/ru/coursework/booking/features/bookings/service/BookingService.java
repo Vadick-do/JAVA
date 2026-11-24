@@ -135,11 +135,14 @@ public final class BookingService {
 
     public int expirePendingHolds() throws SQLException {
         List<ExpiredHoldCandidate> candidates;
-        try (Connection connection = connections.open()) {
+        try (Connection connection = connections.openForCleanup()) {
             candidates = bookings.findExpiredHoldCandidates(connection, EXPIRATION_BATCH_SIZE);
         }
         int expiredCount = 0;
         for (ExpiredHoldCandidate candidate : candidates) {
+            if (Thread.currentThread().isInterrupted()) {
+                break;
+            }
             if (expireHold(candidate)) {
                 expiredCount++;
             }
@@ -148,7 +151,7 @@ public final class BookingService {
     }
 
     private boolean expireHold(ExpiredHoldCandidate candidate) throws SQLException {
-        try (Connection connection = connections.open()) {
+        try (Connection connection = connections.openForCleanup()) {
             connection.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
             connection.setAutoCommit(false);
             try {

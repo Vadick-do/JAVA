@@ -8,6 +8,7 @@ import lab7.model.WebCamera;
 import lab7.net.CameraRequest;
 import lab7.net.CameraResponse;
 import lab7.net.LogResult;
+import lab7.net.StatisticsPacket;
 import lab7.net.TcpProtocol;
 import lab7.server.io.CamerasCsvWriter;
 
@@ -16,12 +17,14 @@ import java.io.Serializable;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.List;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 class CameraRequests {
     private static final int MAX_FILE_NAME_LENGTH = 255;
+    private static final int READINGS_PER_PACKET = 24;
     private final CameraServer server = new CameraServer();
     private final Path dataDirectory;
     private final Map<Path, CamerasCsvWriter> journals = new HashMap<>();
@@ -32,6 +35,40 @@ class CameraRequests {
 
     void loadDefaultFile() throws IOException {
         server.loadCameras(sourceFile(TcpProtocol.DEFAULT_FILE).toString());
+    }
+
+    synchronized void updateCharacteristics() {
+        server.updateCharacteristics();
+    }
+
+    synchronized List<StatisticsPacket> statistics() {
+        List<StatisticsPacket.Reading> readings = new ArrayList<>();
+        int webCameras = 0;
+        int photoCameras = 0;
+        int smartphones = 0;
+        for (Camera camera : server.getCameras()) {
+            if (camera instanceof WebCamera web) {
+                webCameras++;
+                readings.add(new StatisticsPacket.Reading(web.getId(), WebCamera.TYPE, web.getFPS()));
+            } else if (camera instanceof PhotoCamera photo) {
+                photoCameras++;
+                readings.add(new StatisticsPacket.Reading(photo.getId(), PhotoCamera.TYPE, photo.getIso()));
+            } else if (camera instanceof Smartphone phone) {
+                smartphones++;
+                readings.add(new StatisticsPacket.Reading(phone.getId(), Smartphone.TYPE, phone.getStorage()));
+            }
+        }
+
+        long timestamp = System.currentTimeMillis();
+        int partCount = Math.max(1, (readings.size() + READINGS_PER_PACKET - 1) / READINGS_PER_PACKET);
+        List<StatisticsPacket> packets = new ArrayList<>(partCount);
+        for (int part = 0; part < partCount; part++) {
+            int start = part * READINGS_PER_PACKET;
+            int end = Math.min(start + READINGS_PER_PACKET, readings.size());
+            StatisticsPacket.Reading[] values = readings.subList(start, end).toArray(StatisticsPacket.Reading[]::new);
+            packets.add(new StatisticsPacket(timestamp, part, partCount, webCameras, photoCameras, smartphones, values));
+        }
+        return packets;
     }
 
     synchronized byte[] handle(CameraRequest request) throws IOException {
@@ -165,7 +202,8 @@ class CameraRequests {
             journals.put(csv, journal);
         }
         int changes = journal.writeChanges(result.getCams());
-        return new LogResult(result, changes);
+        return new LogResult(changes, result.getObjectCount(), result.getPropertiesRead(),
+                result.getPropertiesMissing(), result.getWarnings().toArray(String[]::new));
     }
 
     private void addCamera(String type, String model, String first, String second) {

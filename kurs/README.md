@@ -65,6 +65,9 @@ Compose подключает `application.properties` для чтения и п�
 | `db.password` | `DB_PASSWORD` |
 | `http.host` | `HTTP_HOST` |
 | `http.port` | `HTTP_PORT` |
+| `cleanup.interval.seconds` | `CLEANUP_INTERVAL_SECONDS` |
+
+Интервал очистки задаётся положительным целым числом секунд, по умолчанию 30. Первый проход начинается после запуска HTTP. Остальные начинаются через заданный интервал после окончания предыдущего. Очистка сохраняет `EXPIRED` для просроченных холдов и холдов на уже начавшиеся слоты. Срок холда составляет 10 минут.
 
 Для смены HTTP-порта без пересборки создайте второй файл и задайте в нём `http.port=9090`. Уберите `HTTP_PORT` из окружения и `.env`, если хотите использовать значение файла. Запустите уже собранный образ:
 
@@ -96,7 +99,7 @@ curl -i http://127.0.0.1:18080/health
 
 Карточка неактивного ресурса и неизвестный маршрут возвращают 404. Поля ресурса: `id`, `name`, `type` (`TABLE` или `MEETING_ROOM`), `capacity`, `active`. HTTP-ответы имеют Content-Type `application/json`. Ошибка имеет поля `code` и `message`: `INVALID_REQUEST` для 400, `NOT_FOUND` для 404, `INTERNAL_ERROR` для внутреннего сбоя 500. Ответ 500 не содержит SQL, параметров подключения или stack trace. `/health` не обращается к БД и не доказывает её доступность. Демо-данные автоматически не добавляются.
 
-В серверном MVC роль Controller выполняет `ResourceHandler`: читает ID и вызывает сервис. Model — `Resource`, `ResourceService` и репозиторий PostgreSQL. View — `ResourceResponse` и его сериализация Jackson в JSON. `Application` вручную связывает зависимости через конструкторы. При SIGTERM или Ctrl+C shutdown hook останавливает HTTP-сервер.
+В серверном MVC роль Controller выполняет `ResourceHandler`: читает ID и вызывает сервис. Model — `Resource`, `ResourceService` и репозиторий PostgreSQL. View — `ResourceResponse` и его сериализация Jackson в JSON. `Application` вручную связывает зависимости через конструкторы. При SIGTERM или Ctrl+C shutdown hook останавливает фоновую очистку и HTTP-сервер.
 
 ## Модели
 

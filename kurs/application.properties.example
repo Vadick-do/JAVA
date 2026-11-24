@@ -4,3 +4,4 @@ db.name=booking_coursework
 db.user=booking
 http.host=0.0.0.0
 http.port=8080
+cleanup.interval.seconds=30

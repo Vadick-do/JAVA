@@ -39,6 +39,7 @@ class AppConfigTest {
         assertEquals("file-password", config.getDatabasePassword());
         assertEquals("0.0.0.0", config.getHttpHost());
         assertEquals(8080, config.getHttpPort());
+        assertEquals(30, config.getCleanupIntervalSeconds());
     }
 
     @Test
@@ -144,5 +145,25 @@ class AppConfigTest {
                 () -> AppConfig.load(file, Map.of()));
 
         assertTrue(exception.getMessage().contains("http.host"));
+    }
+
+    @Test
+    void readsCleanupIntervalFromFileAndAllowsEnvironmentOverride() throws IOException {
+        Path file = Files.writeString(directory.resolve("application.properties"),
+                FILE_SETTINGS + "cleanup.interval.seconds=45\n");
+
+        assertEquals(45, AppConfig.load(file, Map.of()).getCleanupIntervalSeconds());
+        assertEquals(2, AppConfig.load(file, Map.of("CLEANUP_INTERVAL_SECONDS", "2")).getCleanupIntervalSeconds());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "abc", "0", "-1", "2147483648"})
+    void rejectsInvalidCleanupInterval(String interval) throws IOException {
+        Path file = Files.writeString(directory.resolve("application.properties"), FILE_SETTINGS);
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> AppConfig.load(file, Map.of("CLEANUP_INTERVAL_SECONDS", interval)));
+
+        assertTrue(exception.getMessage().contains("cleanup.interval.seconds"));
     }
 }

@@ -18,7 +18,8 @@ import java.nio.file.Path;
 public class TcpServer {
     public static void main(String[] args) {
         try (ServerSocket server = new ServerSocket()) {
-            server.bind(NetworkSettings.loadAddress());
+            NetworkSettings settings = NetworkSettings.load();
+            server.bind(settings.serverAddress());
             Path dataDirectory = Files.isDirectory(Path.of("lab7")) ? Path.of("lab7") : Path.of(".");
             CameraRequests requests = new CameraRequests(dataDirectory);
             try {
@@ -26,12 +27,14 @@ public class TcpServer {
             } catch (IOException | IllegalArgumentException e) {
                 System.err.println("Ошибка загрузки данных: " + e.getMessage());
             }
-            System.out.println("Сервер запущен: " + server.getLocalSocketAddress());
-
-            while (true) {
-                Socket socket = server.accept();
-                Thread worker = new Thread(() -> handleClient(socket, requests));
-                worker.start();
+            try (CameraBackgroundTasks background = new CameraBackgroundTasks(settings, requests)) {
+                background.start();
+                System.out.println("Сервер запущен: " + server.getLocalSocketAddress());
+                while (true) {
+                    Socket socket = server.accept();
+                    Thread worker = new Thread(() -> handleClient(socket, requests));
+                    worker.start();
+                }
             }
         } catch (IOException | IllegalArgumentException e) {
             System.err.println("Ошибка сервера: " + e.getMessage());

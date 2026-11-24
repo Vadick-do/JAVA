@@ -83,6 +83,12 @@ public class CameraServer {
         }
     }
 
+    void updateCharacteristics() {
+        for (int index = 0; index < cams.size(); index++) {
+            randomizeCharacteristic(index);
+        }
+    }
+
     public void toggleSpecialAction(int index) {
         Camera cam = cams.get(index);
         if (cam instanceof WebCamera wc) {

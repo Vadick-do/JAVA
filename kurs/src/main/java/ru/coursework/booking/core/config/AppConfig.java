@@ -15,13 +15,16 @@ public final class AppConfig {
     private final String databasePassword;
     private final String httpHost;
     private final int httpPort;
+    private final int cleanupIntervalSeconds;
 
-    private AppConfig(String jdbcUrl, String databaseUser, String databasePassword, String httpHost, int httpPort) {
+    private AppConfig(String jdbcUrl, String databaseUser, String databasePassword, String httpHost, int httpPort,
+                      int cleanupIntervalSeconds) {
         this.jdbcUrl = jdbcUrl;
         this.databaseUser = databaseUser;
         this.databasePassword = databasePassword;
         this.httpHost = httpHost;
         this.httpPort = httpPort;
+        this.cleanupIntervalSeconds = cleanupIntervalSeconds;
     }
 
     public static AppConfig load(Path path, Map<String, String> environment) throws IOException {
@@ -45,8 +48,10 @@ public final class AppConfig {
         }
         int httpPort = parsePort(environment.getOrDefault("HTTP_PORT", file.getProperty("http.port", "8080")),
                 "http.port (HTTP_PORT)");
+        int cleanupIntervalSeconds = parseCleanupInterval(environment.getOrDefault("CLEANUP_INTERVAL_SECONDS",
+                file.getProperty("cleanup.interval.seconds", "30")));
         return new AppConfig("jdbc:postgresql://" + host + ":" + port + "/" + encodedDatabase,
-                user, password, httpHost, httpPort);
+                user, password, httpHost, httpPort, cleanupIntervalSeconds);
     }
 
     private static String required(Map<String, String> environment, Properties file, String variable, String key) {
@@ -71,6 +76,20 @@ public final class AppConfig {
         return port;
     }
 
+    private static int parseCleanupInterval(String value) {
+        String error = "cleanup.interval.seconds (CLEANUP_INTERVAL_SECONDS): укажите положительное целое число.";
+        int seconds;
+        try {
+            seconds = Integer.parseInt(value);
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException(error);
+        }
+        if (seconds < 1) {
+            throw new IllegalArgumentException(error);
+        }
+        return seconds;
+    }
+
     public String getJdbcUrl() {
         return jdbcUrl;
     }
@@ -89,5 +108,9 @@ public final class AppConfig {
 
     public int getHttpPort() {
         return httpPort;
+    }
+
+    public int getCleanupIntervalSeconds() {
+        return cleanupIntervalSeconds;
     }
 }

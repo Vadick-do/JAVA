@@ -1,6 +1,7 @@
 package ru.coursework.booking;
 
 import io.javalin.Javalin;
+import ru.coursework.booking.background.ExpiredHoldCleanup;
 import ru.coursework.booking.core.config.AppConfig;
 import ru.coursework.booking.core.repository.postgres.MigrationRunner;
 import ru.coursework.booking.core.repository.postgres.ConnectionFactory;
@@ -41,13 +42,15 @@ public class Application {
                     new PostgresBookingRepository());
             Javalin server = HttpServer.create(new ResourceHandler(resources), new SlotHandler(slots),
                     new BookingHandler(bookings));
+            ExpiredHoldCleanup cleanup = new ExpiredHoldCleanup();
             try {
                 server.start(config.getHttpHost(), config.getHttpPort());
+                Runtime.getRuntime().addShutdownHook(new Thread(() -> stop(server, cleanup), "application-shutdown"));
+                cleanup.start(bookings::expirePendingHolds, config.getCleanupIntervalSeconds());
             } catch (RuntimeException exception) {
-                server.stop();
+                stop(server, cleanup);
                 throw exception;
             }
-            Runtime.getRuntime().addShutdownHook(new Thread(server::stop, "http-shutdown"));
         } catch (IOException exception) {
             System.err.println("Не удалось прочитать файл конфигурации: " + args[1]);
             System.exit(1);
@@ -57,6 +60,14 @@ public class Application {
         } catch (RuntimeException exception) {
             LOGGER.severe("Не удалось запустить сервер, тип=" + exception.getClass().getSimpleName());
             System.exit(1);
+        }
+    }
+
+    private static void stop(Javalin server, ExpiredHoldCleanup cleanup) {
+        try {
+            cleanup.close();
+        } finally {
+            server.stop();
         }
     }
 }
