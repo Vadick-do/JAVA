@@ -56,8 +56,13 @@ public class TcpProtocol {
         byte[] bytes = new byte[length];
         input.readFully(bytes);
         Set<Class<?>> allowedTypes = type == CameraRequest.class ? REQUEST_TYPES : RESPONSE_TYPES;
-        try (ObjectInputStream objects = new ObjectInputStream(new ByteArrayInputStream(bytes))) {
-            objects.setObjectInputFilter(info -> filter(info, allowedTypes));
+        return deserialize(new ByteArrayInputStream(bytes), type, allowedTypes, MAX_MESSAGE_BYTES / Integer.BYTES);
+    }
+
+    static <T> T deserialize(ByteArrayInputStream bytes, Class<T> type, Set<Class<?>> allowedTypes,
+                             int maxArrayLength) throws IOException {
+        try (ObjectInputStream objects = new ObjectInputStream(bytes)) {
+            objects.setObjectInputFilter(info -> filter(info, allowedTypes, maxArrayLength));
             Object message = objects.readObject();
             if (!type.isInstance(message)) {
                 throw new IOException("Неожиданный тип сообщения.");
@@ -85,8 +90,9 @@ public class TcpProtocol {
         output.flush();
     }
 
-    private static ObjectInputFilter.Status filter(ObjectInputFilter.FilterInfo info, Set<Class<?>> allowedTypes) {
-        if (info.depth() > 12 || info.arrayLength() > MAX_MESSAGE_BYTES / Integer.BYTES) {
+    private static ObjectInputFilter.Status filter(ObjectInputFilter.FilterInfo info, Set<Class<?>> allowedTypes,
+                                                   int maxArrayLength) {
+        if (info.depth() > 12 || info.arrayLength() > maxArrayLength) {
             return ObjectInputFilter.Status.REJECTED;
         }
         Class<?> type = info.serialClass();

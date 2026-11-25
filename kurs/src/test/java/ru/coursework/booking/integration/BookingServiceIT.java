@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -540,6 +541,110 @@ class BookingServiceIT {
         } finally {
             stopWorkers(worker, List.of());
         }
+    }
+
+    @Test
+    void confirmationRejectsHoldExpiredByConcurrentCleanup() throws Exception {
+        UUID id;
+        try (Connection connection = connections.open()) {
+            id = insertBooking(connection, 1, "HOLD", bookings.currentTime(connection).minusSeconds(660));
+        }
+
+        var race = queueBehindSlotLock(service::expirePendingHolds,
+                () -> service.confirmBooking(id, "Анна", "контакт"));
+
+        assertEquals(1, race.first().get(7, TimeUnit.SECONDS).intValue());
+        ExecutionException error = assertThrows(ExecutionException.class,
+                () -> race.second().get(7, TimeUnit.SECONDS));
+        assertInstanceOf(IllegalStateException.class, error.getCause());
+        assertEquals("EXPIRED", readStatus(id));
+        assertEquals(1, countBookings());
+    }
+
+    @Test
+    void confirmationRejectsHoldCancelledByConcurrentRequest() throws Exception {
+        UUID id = service.createHold(1).getId();
+
+        var race = queueBehindSlotLock(() -> service.cancelBooking(id),
+                () -> service.confirmBooking(id, "Анна", "контакт"));
+
+        Booking cancelled = race.first().get(7, TimeUnit.SECONDS);
+        assertEquals(BookingStatus.CANCELLED, cancelled.getStatus());
+        assertNull(cancelled.getConfirmedAt());
+        ExecutionException error = assertThrows(ExecutionException.class,
+                () -> race.second().get(7, TimeUnit.SECONDS));
+        assertInstanceOf(IllegalStateException.class, error.getCause());
+        assertEquals("CANCELLED", readStatus(id));
+        assertEquals(1, countBookings());
+    }
+
+    @Test
+    void cancellationPreservesConfirmationFromConcurrentRequest() throws Exception {
+        UUID id = service.createHold(1).getId();
+
+        var race = queueBehindSlotLock(() -> service.confirmBooking(id, "Анна", "контакт"),
+                () -> service.cancelBooking(id));
+
+        Booking confirmed = race.first().get(7, TimeUnit.SECONDS);
+        Booking cancelled = race.second().get(7, TimeUnit.SECONDS);
+        assertEquals(BookingStatus.CONFIRMED, confirmed.getStatus());
+        assertEquals(BookingStatus.CANCELLED, cancelled.getStatus());
+        try (Connection connection = connections.open()) {
+            Booking saved = bookings.findById(connection, id).orElseThrow();
+            assertEquals(BookingStatus.CANCELLED, saved.getStatus());
+            assertEquals(confirmed.getConfirmedAt(), saved.getConfirmedAt());
+            assertEquals("Анна", saved.getCustomerName());
+            assertEquals("контакт", saved.getCustomerContact());
+            assertEquals(cancelled.getCancelledAt(), saved.getCancelledAt());
+        }
+        assertEquals(1, countBookings());
+    }
+
+    @Test
+    void concurrentCleanupLeavesReplacementHoldActive() throws Exception {
+        UUID oldId;
+        try (Connection connection = connections.open()) {
+            oldId = insertBooking(connection, 1, "HOLD", bookings.currentTime(connection).minusSeconds(660));
+        }
+
+        var race = queueBehindSlotLock(() -> service.createHold(1), service::expirePendingHolds);
+
+        Booking replacement = race.first().get(7, TimeUnit.SECONDS);
+        assertEquals(0, race.second().get(7, TimeUnit.SECONDS).intValue());
+        assertNotEquals(oldId, replacement.getId());
+        assertEquals(1, replacement.getSlotId());
+        assertEquals("EXPIRED", readStatus(oldId));
+        assertEquals("HOLD", readStatus(replacement.getId()));
+        assertEquals(2, countBookings());
+    }
+
+    private <T, U> ConcurrentResults<T, U> queueBehindSlotLock(Callable<T> first, Callable<U> second) throws Exception {
+        ExecutorService workers = Executors.newFixedThreadPool(2);
+        try (Connection blocker = connections.open(); Connection observer = connections.open()) {
+            blocker.setAutoCommit(false);
+            Future<T> firstResult;
+            Future<U> secondResult;
+            List<Integer> workerPids;
+            try {
+                new PostgresSlotRepository().lockById(blocker, 1).orElseThrow();
+                int blockerPid = backendPid(blocker);
+                firstResult = workers.submit(first);
+                awaitBlockedCompetitors(observer, blockerPid, 1);
+                secondResult = workers.submit(second);
+                workerPids = awaitBlockedCompetitors(observer, blockerPid, 2);
+            } finally {
+                blocker.rollback();
+            }
+            workers.shutdown();
+            assertTrue(workers.awaitTermination(7, TimeUnit.SECONDS));
+            awaitClosedCompetitorConnections(observer, workerPids);
+            return new ConcurrentResults<>(firstResult, secondResult);
+        } finally {
+            stopWorkers(workers, List.of());
+        }
+    }
+
+    private record ConcurrentResults<T, U>(Future<T> first, Future<U> second) {
     }
 
     private Future<Booking> submitHold(ExecutorService workers, CountDownLatch ready, CountDownLatch start, long slotId) {

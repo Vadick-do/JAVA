@@ -1,5 +1,6 @@
 package lab7.client.view;
 
+import lab7.client.CameraStatistics;
 import lab7.model.Camera;
 import lab7.model.FileReadResult;
 import lab7.model.Image;
@@ -7,13 +8,18 @@ import lab7.model.PhotoCamera;
 import lab7.model.Smartphone;
 import lab7.model.WebCamera;
 import lab7.net.LogResult;
+import lab7.net.StatisticsPacket;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
+import java.util.StringJoiner;
 
 public class ConsoleView {
     private final Scanner scanner;
+    private CameraStatistics statistics;
+    private String statisticsError;
+    private String mainMenuFile;
 
     public ConsoleView(Scanner scanner) {
         this.scanner = scanner;
@@ -155,8 +161,41 @@ public class ConsoleView {
         System.out.println("Для завершения нажмите Ctrl+C.");
     }
 
-    public void showMenu(String dataFileName) {
+    public String readMenuChoice(String dataFileName) {
+        synchronized (this) {
+            mainMenuFile = dataFileName;
+            showMenu(dataFileName);
+        }
+        try {
+            return readLine();
+        } finally {
+            synchronized (this) {
+                mainMenuFile = null;
+            }
+        }
+    }
+
+    public synchronized void updateStatistics(CameraStatistics statistics) {
+        if (statistics.equals(this.statistics) && statisticsError == null) {
+            return;
+        }
+        this.statistics = statistics;
+        statisticsError = null;
+        if (mainMenuFile != null) {
+            showMenu(mainMenuFile);
+        }
+    }
+
+    public synchronized void showStatisticsError(String message) {
+        statisticsError = message;
+        if (mainMenuFile != null) {
+            showMenu(mainMenuFile);
+        }
+    }
+
+    private void showMenu(String dataFileName) {
         System.out.println("\n--- МЕНЮ ---");
+        printStatistics();
         System.out.println("0. Выход");
         System.out.println("1. Просмотр всех устройств");
         System.out.println("2. Добавить устройство");
@@ -168,6 +207,40 @@ public class ConsoleView {
         System.out.println("8. Изменить название файла с данными");
 
         System.out.print("Выберите действие: ");
+    }
+
+    private void printStatistics() {
+        if (statisticsError != null) {
+            System.out.println("Статистика недоступна: " + statisticsError);
+            return;
+        }
+        if (statistics == null) {
+            System.out.println("Статистика: ожидание данных от сервера.");
+            return;
+        }
+
+        System.out.println("Статистика устройств: веб-камеры — " + statistics.webCameras()
+                + ", фотокамеры — " + statistics.photoCameras() + ", смартфоны — " + statistics.smartphones());
+        StringJoiner fps = new StringJoiner(", ");
+        StringJoiner iso = new StringJoiner(", ");
+        StringJoiner storage = new StringJoiner(", ");
+        for (StatisticsPacket.Reading reading : statistics.readings()) {
+            String id = "ID " + reading.id() + " = ";
+            switch (reading.type()) {
+                case WebCamera.TYPE -> fps.add(id + reading.value());
+                case PhotoCamera.TYPE -> iso.add(id + (int) reading.value());
+                case Smartphone.TYPE -> storage.add(id + reading.value());
+            }
+        }
+        if (fps.length() > 0) {
+            System.out.println("FPS веб-камер: " + fps);
+        }
+        if (iso.length() > 0) {
+            System.out.println("ISO фотокамер: " + iso);
+        }
+        if (storage.length() > 0) {
+            System.out.println("Свободная память смартфонов (МБ): " + storage);
+        }
     }
 
     public int readCameraType() {

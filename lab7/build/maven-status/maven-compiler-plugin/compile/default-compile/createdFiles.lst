@@ -2,6 +2,7 @@ lab7/net/StatisticsPacket$Reading.class
 lab7/net/CameraResponse.class
 lab7/client/controller/CameraController.class
 lab7/net/StatisticsPacket.class
+lab7/client/CameraStatistics.class
 lab7/net/TcpProtocol.class
 lab7/server/io/CamerasFileManager.class
 lab7/model/PhotoCamera.class
@@ -21,6 +22,7 @@ lab7/net/LogResult.class
 lab7/net/NetworkSettings.class
 lab7/model/Camera.class
 lab7/server/io/CamerasFileReader.class
+lab7/client/StatisticsReceiver.class
 lab7/model/Smartphone.class
 lab7/model/Image.class
 lab7/client/TcpClient.class

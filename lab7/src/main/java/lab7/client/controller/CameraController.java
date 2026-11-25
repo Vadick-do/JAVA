@@ -1,6 +1,7 @@
 package lab7.client.controller;
 
 import lab7.client.CameraClient;
+import lab7.client.StatisticsReceiver;
 import lab7.client.view.CommandLineOptions;
 import lab7.client.view.ConsoleView;
 import lab7.model.Camera;
@@ -8,6 +9,7 @@ import lab7.model.FileReadResult;
 import lab7.model.PhotoCamera;
 import lab7.model.Smartphone;
 import lab7.model.WebCamera;
+import lab7.net.NetworkSettings;
 import lab7.net.TcpProtocol;
 
 import java.io.IOException;
@@ -62,18 +64,27 @@ public class CameraController {
     }
 
     private void runInteractive() {
-        try {
+        StatisticsReceiver statistics = startStatistics();
+        try (statistics) {
             runMenu();
         } catch (NoSuchElementException e) {
             view.showMessage("Ввод завершен. Выход из программы.");
         }
     }
 
+    private StatisticsReceiver startStatistics() {
+        try {
+            return new StatisticsReceiver(NetworkSettings.load(), view::updateStatistics, view::showStatisticsError);
+        } catch (IOException | IllegalArgumentException e) {
+            view.showStatisticsError(e.getMessage());
+            return null;
+        }
+    }
+
     private void runMenu() {
         boolean isRunning = true;
         while (isRunning) {
-            view.showMenu(dataFileName);
-            String choice = view.readLine();
+            String choice = view.readMenuChoice(dataFileName);
 
             try {
                 switch (choice) {

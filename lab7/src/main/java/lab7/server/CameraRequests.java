@@ -24,7 +24,6 @@ import java.util.Map;
 
 class CameraRequests {
     private static final int MAX_FILE_NAME_LENGTH = 255;
-    private static final int READINGS_PER_PACKET = 24;
     private final CameraServer server = new CameraServer();
     private final Path dataDirectory;
     private final Map<Path, CamerasCsvWriter> journals = new HashMap<>();
@@ -60,11 +59,12 @@ class CameraRequests {
         }
 
         long timestamp = System.currentTimeMillis();
-        int partCount = Math.max(1, (readings.size() + READINGS_PER_PACKET - 1) / READINGS_PER_PACKET);
+        int packetSize = StatisticsPacket.READINGS_PER_PACKET;
+        int partCount = Math.max(1, (readings.size() + packetSize - 1) / packetSize);
         List<StatisticsPacket> packets = new ArrayList<>(partCount);
         for (int part = 0; part < partCount; part++) {
-            int start = part * READINGS_PER_PACKET;
-            int end = Math.min(start + READINGS_PER_PACKET, readings.size());
+            int start = part * packetSize;
+            int end = Math.min(start + packetSize, readings.size());
             StatisticsPacket.Reading[] values = readings.subList(start, end).toArray(StatisticsPacket.Reading[]::new);
             packets.add(new StatisticsPacket(timestamp, part, partCount, webCameras, photoCameras, smartphones, values));
         }
