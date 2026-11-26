@@ -17,7 +17,11 @@ public record StatisticsPacket(long timestampMillis, int partIndex, int partCoun
             throw new IOException("Недопустимый размер пакета статистики.");
         }
         ByteArrayInputStream bytes = new ByteArrayInputStream(packet.getData(), packet.getOffset(), packet.getLength());
-        return TcpProtocol.deserialize(bytes, StatisticsPacket.class, PACKET_TYPES, READINGS_PER_PACKET);
+        return MessageSerialization.decode(bytes, StatisticsPacket.class, PACKET_TYPES, READINGS_PER_PACKET);
+    }
+
+    public byte[] toBytes() throws IOException {
+        return MessageSerialization.encode(this, MAX_PACKET_BYTES);
     }
 
     public record Reading(int id, String type, double value) implements Serializable {

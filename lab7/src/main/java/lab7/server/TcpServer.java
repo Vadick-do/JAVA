@@ -12,16 +12,13 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.nio.file.Files;
-import java.nio.file.Path;
 
 public class TcpServer {
     public static void main(String[] args) {
         try (ServerSocket server = new ServerSocket()) {
             NetworkSettings settings = NetworkSettings.load();
             server.bind(settings.serverAddress());
-            Path dataDirectory = Files.isDirectory(Path.of("lab7")) ? Path.of("lab7") : Path.of(".");
-            CameraRequests requests = new CameraRequests(dataDirectory);
+            CameraRequests requests = new CameraRequests(settings.dataDirectory());
             try {
                 requests.loadDefaultFile();
             } catch (IOException | IllegalArgumentException e) {

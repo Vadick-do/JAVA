@@ -1,19 +1,15 @@
 package lab7.server;
 
 import lab7.model.Camera;
-import lab7.model.FileReadResult;
 import lab7.model.PhotoCamera;
 import lab7.model.Smartphone;
 import lab7.model.WebCamera;
-import lab7.server.io.CamerasFileManager;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 public class CameraServer {
     private final List<Camera> cams = new ArrayList<>();
-    private final CamerasFileManager fileManager = new CamerasFileManager();
 
     public List<Camera> getCameras() {
         return List.copyOf(cams);
@@ -107,16 +103,6 @@ public class CameraServer {
         } else if (cam instanceof Smartphone sp) {
             sp.clearStorage();
         }
-    }
-
-    public FileReadResult readCameras(String fileName) throws IOException {
-        return fileManager.readFile(fileName);
-    }
-
-    public FileReadResult loadCameras(String fileName) throws IOException {
-        FileReadResult result = readCameras(fileName);
-        addCameras(result.getCams());
-        return result;
     }
 
     void addCameras(List<Camera> cameras) {

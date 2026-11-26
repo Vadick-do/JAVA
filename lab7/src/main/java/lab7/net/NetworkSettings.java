@@ -10,14 +10,15 @@ import java.util.Properties;
 
 public record NetworkSettings(InetSocketAddress serverAddress, InetSocketAddress statisticsAddress,
                               NetworkInterface multicastInterface, int updateIntervalSeconds,
-                              int statisticsIntervalSeconds) {
+                              int statisticsIntervalSeconds, Path dataDirectory) {
 
     public static InetSocketAddress loadAddress() throws IOException {
-        return serverAddress(loadProperties());
+        return serverAddress(loadProperties(propertiesFile()));
     }
 
     public static NetworkSettings load() throws IOException {
-        Properties properties = loadProperties();
+        Path file = propertiesFile();
+        Properties properties = loadProperties(file);
         InetSocketAddress server = serverAddress(properties);
         String host = properties.getProperty("statistics.host", "127.0.0.1").trim();
         if (host.isEmpty()) {
@@ -40,15 +41,19 @@ public record NetworkSettings(InetSocketAddress serverAddress, InetSocketAddress
 
         int updateInterval = positiveInt(properties, "devices.updateIntervalSeconds", "5", Integer.MAX_VALUE);
         int statisticsInterval = positiveInt(properties, "statistics.intervalSeconds", "5", Integer.MAX_VALUE);
-        return new NetworkSettings(server, statistics, multicastInterface, updateInterval, statisticsInterval);
+        return new NetworkSettings(server, statistics, multicastInterface, updateInterval, statisticsInterval,
+                file.getParent());
     }
 
-    private static Properties loadProperties() throws IOException {
+    private static Path propertiesFile() {
         Path file = Path.of("application.properties");
         if (Files.notExists(file)) {
             file = Path.of("lab7", "application.properties");
         }
+        return file.toAbsolutePath().normalize();
+    }
 
+    private static Properties loadProperties(Path file) throws IOException {
         Properties properties = new Properties();
         try (Reader reader = Files.newBufferedReader(file)) {
             properties.load(reader);

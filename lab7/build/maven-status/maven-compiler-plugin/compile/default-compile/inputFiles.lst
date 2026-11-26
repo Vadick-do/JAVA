@@ -15,6 +15,7 @@
 /Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/net/CameraRequest.java
 /Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/net/CameraResponse.java
 /Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/net/LogResult.java
+/Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/net/MessageSerialization.java
 /Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/net/NetworkSettings.java
 /Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/net/StatisticsPacket.java
 /Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/net/TcpProtocol.java
@@ -23,5 +24,4 @@
 /Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/server/CameraServer.java
 /Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/server/TcpServer.java
 /Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/server/io/CamerasCsvWriter.java
-/Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/server/io/CamerasFileManager.java
 /Users/macbook/Desktop/универ/3курс/java/lab7/src/main/java/lab7/server/io/CamerasFileReader.java

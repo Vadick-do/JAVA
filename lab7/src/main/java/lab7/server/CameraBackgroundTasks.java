@@ -2,7 +2,6 @@ package lab7.server;
 
 import lab7.net.NetworkSettings;
 import lab7.net.StatisticsPacket;
-import lab7.net.TcpProtocol;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -34,10 +33,7 @@ class CameraBackgroundTasks implements AutoCloseable {
     private void sendStatistics() {
         try {
             for (StatisticsPacket statistics : requests.statistics()) {
-                byte[] bytes = TcpProtocol.serialize(statistics);
-                if (bytes.length > StatisticsPacket.MAX_PACKET_BYTES) {
-                    throw new IOException("Пакет статистики слишком большой.");
-                }
+                byte[] bytes = statistics.toBytes();
                 DatagramPacket packet = new DatagramPacket(bytes, bytes.length, settings.statisticsAddress());
                 socket.send(packet);
             }

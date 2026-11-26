@@ -8,13 +8,9 @@ import lab7.model.Smartphone;
 import lab7.model.WebCamera;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.ObjectInputFilter;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Set;
@@ -56,32 +52,12 @@ public class TcpProtocol {
         byte[] bytes = new byte[length];
         input.readFully(bytes);
         Set<Class<?>> allowedTypes = type == CameraRequest.class ? REQUEST_TYPES : RESPONSE_TYPES;
-        return deserialize(new ByteArrayInputStream(bytes), type, allowedTypes, MAX_MESSAGE_BYTES / Integer.BYTES);
-    }
-
-    static <T> T deserialize(ByteArrayInputStream bytes, Class<T> type, Set<Class<?>> allowedTypes,
-                             int maxArrayLength) throws IOException {
-        try (ObjectInputStream objects = new ObjectInputStream(bytes)) {
-            objects.setObjectInputFilter(info -> filter(info, allowedTypes, maxArrayLength));
-            Object message = objects.readObject();
-            if (!type.isInstance(message)) {
-                throw new IOException("Неожиданный тип сообщения.");
-            }
-            return type.cast(message);
-        } catch (ClassNotFoundException e) {
-            throw new IOException("Неизвестный класс сообщения.", e);
-        }
+        return MessageSerialization.decode(new ByteArrayInputStream(bytes), type, allowedTypes,
+                MAX_MESSAGE_BYTES / Integer.BYTES);
     }
 
     public static byte[] serialize(Serializable message) throws IOException {
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        try (ObjectOutputStream objects = new ObjectOutputStream(bytes)) {
-            objects.writeObject(message);
-        }
-        if (bytes.size() > MAX_MESSAGE_BYTES) {
-            throw new IOException("Сообщение слишком большое.");
-        }
-        return bytes.toByteArray();
+        return MessageSerialization.encode(message, MAX_MESSAGE_BYTES);
     }
 
     public static void writeMessage(DataOutputStream output, byte[] bytes) throws IOException {
@@ -90,15 +66,4 @@ public class TcpProtocol {
         output.flush();
     }
 
-    private static ObjectInputFilter.Status filter(ObjectInputFilter.FilterInfo info, Set<Class<?>> allowedTypes,
-                                                   int maxArrayLength) {
-        if (info.depth() > 12 || info.arrayLength() > maxArrayLength) {
-            return ObjectInputFilter.Status.REJECTED;
-        }
-        Class<?> type = info.serialClass();
-        if (type == null) {
-            return ObjectInputFilter.Status.UNDECIDED;
-        }
-        return allowedTypes.contains(type) ? ObjectInputFilter.Status.ALLOWED : ObjectInputFilter.Status.REJECTED;
-    }
 }

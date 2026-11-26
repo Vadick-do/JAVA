@@ -11,6 +11,7 @@ import lab7.net.LogResult;
 import lab7.net.StatisticsPacket;
 import lab7.net.TcpProtocol;
 import lab7.server.io.CamerasCsvWriter;
+import lab7.server.io.CamerasFileReader;
 
 import java.io.IOException;
 import java.io.Serializable;
@@ -33,7 +34,7 @@ class CameraRequests {
     }
 
     void loadDefaultFile() throws IOException {
-        server.loadCameras(sourceFile(TcpProtocol.DEFAULT_FILE).toString());
+        server.addCameras(CamerasFileReader.read(sourceFile(TcpProtocol.DEFAULT_FILE)).getCams());
     }
 
     synchronized void updateCharacteristics() {
@@ -141,7 +142,7 @@ class CameraRequests {
             throw new IllegalArgumentException("Неверное число аргументов.");
         }
         String name = args.length == 0 ? TcpProtocol.DEFAULT_FILE : args[0];
-        FileReadResult result = server.readCameras(sourceFile(name).toString());
+        FileReadResult result = CamerasFileReader.read(sourceFile(name));
         byte[] response = response(result);
         if (load) {
             server.addCameras(result.getCams());
@@ -195,13 +196,9 @@ class CameraRequests {
         if (Files.exists(csv) && Files.isSameFile(source, csv)) {
             throw new IOException("Файл данных и CSV-журнал должны быть разными файлами.");
         }
-        FileReadResult result = server.readCameras(source.toString());
-        CamerasCsvWriter journal = journals.get(csv);
-        if (journal == null) {
-            journal = new CamerasCsvWriter(csv.toString());
-            journals.put(csv, journal);
-        }
-        int changes = journal.writeChanges(result.getCams());
+        FileReadResult result = CamerasFileReader.read(source);
+        CamerasCsvWriter journal = journals.computeIfAbsent(csv, CamerasCsvWriter::new);
+        int changes = journal.writeChanges(source, result.getCams());
         return new LogResult(changes, result.getObjectCount(), result.getPropertiesRead(),
                 result.getPropertiesMissing(), result.getWarnings().toArray(String[]::new));
     }

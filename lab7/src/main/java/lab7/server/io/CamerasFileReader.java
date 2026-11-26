@@ -8,10 +8,9 @@ import lab7.model.WebCamera;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -24,23 +23,18 @@ public class CamerasFileReader {
     private int propertiesRead = 0;
     private int propertiesMissing = 0;
 
-    public CamerasFileReader(BufferedReader reader) {
+    private CamerasFileReader(BufferedReader reader) {
         this.reader = reader;
     }
 
-    public CamerasFileReader(Reader reader) {
-        this.reader = (reader instanceof BufferedReader br) ? br : new BufferedReader(reader);
+    public static FileReadResult read(Path file) throws IOException {
+        try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+            return new CamerasFileReader(reader).readAll();
+        }
     }
 
-    public CamerasFileReader(InputStream inputStream) {
-        this.reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
-    }
-
-    public FileReadResult readAll() throws IOException {
+    private FileReadResult readAll() throws IOException {
         List<Camera> cams = new ArrayList<>();
-        warnings.clear();
-        propertiesRead = 0;
-        propertiesMissing = 0;
 
         String currentType = null;
         Map<String, String> currentFields = new HashMap<>();

@@ -6,11 +6,11 @@ import lab7.model.Smartphone;
 import lab7.model.WebCamera;
 
 import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -19,20 +19,22 @@ import java.util.List;
 import java.util.Map;
 
 public class CamerasCsvWriter {
-    private final File file;
-    private List<Map<String, String>> previous = new ArrayList<>();
+    private final Path file;
+    private Path previousSource;
+    private List<Map<String, String>> previous = List.of();
 
-    public CamerasCsvWriter(String fileName) {
-        file = new File(fileName);
+    public CamerasCsvWriter(Path file) {
+        this.file = file;
     }
 
-    public int writeChanges(List<Camera> cams) throws IOException {
+    public int writeChanges(Path source, List<Camera> cams) throws IOException {
+        boolean emptyFile = Files.notExists(file) || Files.size(file) == 0;
         List<Map<String, String>> current = new ArrayList<>();
-        List<Map<String, String>> saved = file.length() > 0 ? previous : List.of();
+        List<Map<String, String>> saved = !emptyFile && source.equals(previousSource) ? previous : List.of();
         int changes = 0;
-        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
-                new FileOutputStream(file, true), StandardCharsets.UTF_8))) {
-            if (file.length() == 0) {
+        try (BufferedWriter writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
+            if (emptyFile) {
                 writer.write("time,number,property,value\r\n");
             }
 
@@ -40,7 +42,7 @@ public class CamerasCsvWriter {
             for (int i = 0; i < cams.size(); i++) {
                 Map<String, String> fields = getProperties(cams.get(i));
                 current.add(fields);
-                Map<String, String> old = i < saved.size() ? saved.get(i) : new LinkedHashMap<>();
+                Map<String, String> old = i < saved.size() ? saved.get(i) : Map.of();
                 boolean newCamera = !fields.get("type").equals(old.get("type"));
 
                 for (Map.Entry<String, String> entry : fields.entrySet()) {
@@ -53,6 +55,7 @@ public class CamerasCsvWriter {
             }
         }
         previous = current;
+        previousSource = source;
         return changes;
     }
 
