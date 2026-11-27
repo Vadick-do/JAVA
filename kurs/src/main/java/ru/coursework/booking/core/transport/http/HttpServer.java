@@ -3,10 +3,11 @@ package ru.coursework.booking.core.transport.http;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import io.javalin.Javalin;
+import io.javalin.http.HandlerType;
 import io.javalin.http.HttpResponseException;
 import io.javalin.json.JavalinJackson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import io.javalin.router.Endpoint;
+import ru.coursework.booking.core.logging.ApplicationLog;
 import ru.coursework.booking.features.bookings.transport.http.BookingHandler;
 import ru.coursework.booking.features.resources.transport.http.ResourceHandler;
 import ru.coursework.booking.features.slots.transport.http.SlotHandler;
@@ -14,12 +15,14 @@ import ru.coursework.booking.features.slots.transport.http.SlotHandler;
 import java.util.Map;
 
 public final class HttpServer {
-    private static final Logger LOGGER = LoggerFactory.getLogger(HttpServer.class);
-
     private HttpServer() {
     }
 
     public static Javalin create(ResourceHandler resources, SlotHandler slots, BookingHandler bookings) {
+        return create(resources, slots, bookings, ApplicationLog.CONSOLE_ONLY);
+    }
+
+    public static Javalin create(ResourceHandler resources, SlotHandler slots, BookingHandler bookings, ApplicationLog log) {
         return Javalin.create(config -> {
             config.concurrency.useVirtualThreads = false;
             config.jsonMapper(new JavalinJackson().updateMapper(mapper -> {
@@ -52,11 +55,17 @@ public final class HttpServer {
                 context.status(exception.getStatus()).json(new ErrorResponse(code, message));
             });
             config.routes.exception(Exception.class, (exception, context) -> {
-                LOGGER.error("HTTP: ошибка обработки запроса, тип=" + exception.getClass().getSimpleName());
+                log.error("HTTP: ошибка обработки запроса", exception);
                 context.status(500).json(new ErrorResponse("INTERNAL_ERROR", "Внутренняя ошибка сервера."));
             });
-            config.events.serverStarted(() -> LOGGER.info("HTTP-сервер запущен."));
-            config.events.serverStopped(() -> LOGGER.info("HTTP-сервер остановлен."));
+            config.requestLogger.http((context, milliseconds) -> {
+                Endpoint endpoint = context.endpoints().matchedHttpEndpoint();
+                if (endpoint != null && endpoint.method == HandlerType.POST && context.statusCode() < 500) {
+                    log.event("HTTP POST " + endpoint.path + " → " + context.statusCode());
+                }
+            });
+            config.events.serverStarted(() -> log.event("HTTP-сервер запущен."));
+            config.events.serverStopped(() -> log.event("HTTP-сервер остановлен."));
         });
     }
 }

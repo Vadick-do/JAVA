@@ -9,8 +9,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import ru.coursework.booking.core.config.AppConfig;
+import ru.coursework.booking.core.config.AppConfig.LogSettings;
+import ru.coursework.booking.core.logging.ApplicationLog;
 import ru.coursework.booking.core.repository.postgres.ConnectionFactory;
 import ru.coursework.booking.core.repository.postgres.MigrationRunner;
 import ru.coursework.booking.core.transport.http.HttpServer;
@@ -39,6 +42,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
+import java.util.logging.Level;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -48,9 +52,13 @@ class SlotHttpIT {
     private static ConnectionFactory connections;
     private Javalin server;
     private HttpClient client;
+    private ApplicationLog log;
     private Instant currentHour;
     private Instant from;
     private Instant to;
+
+    @TempDir
+    Path logDirectory;
 
     @BeforeAll
     static void prepareDatabase(@TempDir Path directory) throws Exception {
@@ -62,7 +70,7 @@ class SlotHttpIT {
     }
 
     @BeforeEach
-    void prepareDataAndServer() throws SQLException {
+    void prepareDataAndServer() throws Exception {
         try (Connection connection = connections.open(); var statement = connection.createStatement()) {
             try (var rows = statement.executeQuery("SELECT current_database(), date_trunc('hour', clock_timestamp(), 'UTC')")) {
                 assertTrue(rows.next());
@@ -86,18 +94,18 @@ class SlotHttpIT {
         SlotService slotService = new SlotService(connections, resources, new PostgresSlotRepository());
         BookingService bookings = new BookingService(connections, resources,
                 new PostgresSlotRepository(), new PostgresBookingRepository());
-        server = HttpServer.create(new ResourceHandler(resourceService), new SlotHandler(slotService), new BookingHandler(bookings))
+        log = ApplicationLog.open(new LogSettings(logDirectory, 1048576, 3, Level.INFO));
+        server = HttpServer.create(new ResourceHandler(resourceService), new SlotHandler(slotService), new BookingHandler(bookings), log)
                 .start("127.0.0.1", 0);
         client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
     }
 
     @AfterEach
     void stopServer() {
-        if (client != null) {
-            client.close();
-        }
-        if (server != null) {
-            server.stop();
+        try (ApplicationLog appLog = log; HttpClient httpClient = client) {
+            if (server != null) {
+                server.stop();
+            }
         }
     }
 
@@ -182,6 +190,27 @@ class SlotHttpIT {
         assertError(get(slotsPath("3000000000", from.toString(), earlierMoment)), 400, "INVALID_REQUEST");
     }
 
+    @ParameterizedTest
+    @CsvSource({
+            "+300000-01-01T00:00:00Z, +300000-01-02T00:00:00Z",
+            "0001-01-01T00:59:59+01:00, 0001-01-01T02:00:00+01:00",
+            "9999-12-31T21:00:00-01:00, 9999-12-31T23:00:00-01:00"
+    })
+    void rejectsBoundariesOutsideSupportedUtcYears(String start, String end) throws Exception {
+        assertError(get(slotsPath("3000000000", start, end)), 400, "INVALID_REQUEST");
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "0001-01-01T01:00:00+01:00, 0001-01-01T02:00:00+01:00",
+            "9999-12-31T23:00:00Z, 9999-12-31T23:59:59.999999999Z"
+    })
+    void acceptsSupportedUtcDateBoundaries(String start, String end) throws Exception {
+        HttpResponse<String> response = get(slotsPath("3000000000", start, end));
+        assertJsonStatus(response, 200);
+        assertEquals(JSON.readTree("[]"), JSON.readTree(response.body()));
+    }
+
     @Test
     void reflectsBookingStatesAndExcludesStartedSlotsWithoutCleanup() throws Exception {
         insertSlot(1, 3_000_000_000L, from);
@@ -213,6 +242,23 @@ class SlotHttpIT {
         assertEquals(1, readSlots("3000000000", from, to).size());
     }
 
+    @Test
+    void returnsSafeErrorOnStatementTimeoutAndRecoversAfterUnlock() throws Exception {
+        insertSlot(1, 3_000_000_000L, from);
+        try (Connection blocker = connections.open(); var statement = blocker.createStatement()) {
+            blocker.setAutoCommit(false);
+            try {
+                statement.execute("LOCK TABLE slots IN ACCESS EXCLUSIVE MODE");
+                assertError(get(slotsPath("3000000000", from.toString(), to.toString())), 500, "INTERNAL_ERROR");
+                assertTrue(Files.readString(logDirectory.resolve("errors.0.log")).contains("SQLSTATE=57014"));
+                assertJsonStatus(get("/health"), 200);
+            } finally {
+                blocker.rollback();
+            }
+        }
+        assertEquals(1, readSlots("3000000000", from, to).size());
+    }
+
     private JsonNode readSlots(String id, Instant start, Instant end) throws Exception {
         HttpResponse<String> response = get(slotsPath(id, start.toString(), end.toString()));
         assertJsonStatus(response, 200);
@@ -228,7 +274,7 @@ class SlotHttpIT {
 
     private HttpResponse<String> get(String path) throws Exception {
         HttpRequest request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.port() + path))
-                .timeout(Duration.ofSeconds(5)).GET().build();
+                .timeout(Duration.ofSeconds(9)).GET().build();
         return client.send(request, HttpResponse.BodyHandlers.ofString());
     }
 

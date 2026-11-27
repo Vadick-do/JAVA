@@ -36,6 +36,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -438,6 +439,39 @@ class BookingServiceIT {
         assertEquals("EXPIRED", readStatus(oldId));
         assertEquals("HOLD", readStatus(recovered.getId()));
         assertEquals(2, countBookings());
+    }
+
+    @Test
+    void preservesPrimaryErrorWhenRollbackAlsoFailsAndNextHoldSucceeds() throws Exception {
+        ExecutorService worker = Executors.newSingleThreadExecutor();
+        try (Connection blocker = connections.open(); Connection observer = connections.open()) {
+            blocker.setAutoCommit(false);
+            try {
+                new PostgresSlotRepository().lockById(blocker, 1).orElseThrow();
+                Future<Booking> attempt = worker.submit(() -> service.createHold(1));
+                List<Integer> blocked = awaitBlockedCompetitors(observer, backendPid(blocker), 1);
+                try (var terminate = observer.prepareStatement("SELECT pg_terminate_backend(?)")) {
+                    terminate.setInt(1, blocked.getFirst());
+                    try (var rows = terminate.executeQuery()) {
+                        assertTrue(rows.next() && rows.getBoolean(1));
+                    }
+                }
+
+                ExecutionException failure = assertThrows(ExecutionException.class, () -> attempt.get(5, TimeUnit.SECONDS));
+                SQLException primary = assertInstanceOf(SQLException.class, failure.getCause());
+                assertEquals("57P01", primary.getSQLState());
+                assertEquals(1, primary.getSuppressed().length);
+                SQLException rollback = assertInstanceOf(SQLException.class, primary.getSuppressed()[0]);
+                assertEquals("08003", rollback.getSQLState());
+                awaitClosedCompetitorConnections(observer, blocked);
+            } finally {
+                blocker.rollback();
+            }
+        } finally {
+            stopWorkers(worker, List.of());
+        }
+        assertEquals(0, countBookings());
+        assertEquals("HOLD", readStatus(service.createHold(1).getId()));
     }
 
     @ParameterizedTest

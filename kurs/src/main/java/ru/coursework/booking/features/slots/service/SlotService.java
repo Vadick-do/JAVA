@@ -14,6 +14,9 @@ import java.util.List;
 import java.util.NoSuchElementException;
 
 public final class SlotService {
+    private static final Instant EARLIEST_BOUNDARY = Instant.parse("0001-01-01T00:00:00Z");
+    private static final Instant LATEST_BOUNDARY_EXCLUSIVE = Instant.parse("+10000-01-01T00:00:00Z");
+
     private final ConnectionFactory connections;
     private final ResourceRepository resources;
     private final SlotRepository slots;
@@ -33,6 +36,9 @@ public final class SlotService {
         }
         if (!from.isBefore(to)) {
             throw new IllegalArgumentException("Начало диапазона должно быть раньше конца.");
+        }
+        if (from.isBefore(EARLIEST_BOUNDARY) || !to.isBefore(LATEST_BOUNDARY_EXCLUSIVE)) {
+            throw new IllegalArgumentException("Границы диапазона должны быть в годах от 0001 до 9999 по UTC.");
         }
         if (Duration.between(from, to).compareTo(Duration.ofDays(7)) > 0) {
             throw new IllegalArgumentException("Диапазон не должен превышать 7 суток.");

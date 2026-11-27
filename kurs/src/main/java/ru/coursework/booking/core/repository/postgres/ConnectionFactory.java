@@ -15,17 +15,21 @@ public final class ConnectionFactory {
     }
 
     public Connection open() throws SQLException {
-        return DriverManager.getConnection(config.getJdbcUrl(), config.getDatabaseUser(), config.getDatabasePassword());
+        return open(10, 5);
     }
 
     public Connection openForCleanup() throws SQLException {
+        return open(4, 3);
+    }
+
+    private Connection open(int socketTimeoutSeconds, int statementTimeoutSeconds) throws SQLException {
         Properties properties = new Properties();
         properties.setProperty("user", config.getDatabaseUser());
         properties.setProperty("password", config.getDatabasePassword());
         properties.setProperty("loginTimeout", "3");
         properties.setProperty("connectTimeout", "3");
-        properties.setProperty("socketTimeout", "4");
-        properties.setProperty("options", "-c statement_timeout=3s");
+        properties.setProperty("socketTimeout", Integer.toString(socketTimeoutSeconds));
+        properties.setProperty("options", "-c statement_timeout=" + statementTimeoutSeconds + "s");
         return DriverManager.getConnection(config.getJdbcUrl(), properties);
     }
 }

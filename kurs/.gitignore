@@ -2,3 +2,4 @@
 /.maven-repository/
 /.env
 /application.properties
+/logs/

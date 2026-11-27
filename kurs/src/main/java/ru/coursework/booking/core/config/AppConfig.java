@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Properties;
+import java.util.logging.Level;
 
 public final class AppConfig {
     private final String jdbcUrl;
@@ -16,15 +17,17 @@ public final class AppConfig {
     private final String httpHost;
     private final int httpPort;
     private final int cleanupIntervalSeconds;
+    private final LogSettings logSettings;
 
     private AppConfig(String jdbcUrl, String databaseUser, String databasePassword, String httpHost, int httpPort,
-                      int cleanupIntervalSeconds) {
+                      int cleanupIntervalSeconds, LogSettings logSettings) {
         this.jdbcUrl = jdbcUrl;
         this.databaseUser = databaseUser;
         this.databasePassword = databasePassword;
         this.httpHost = httpHost;
         this.httpPort = httpPort;
         this.cleanupIntervalSeconds = cleanupIntervalSeconds;
+        this.logSettings = logSettings;
     }
 
     public static AppConfig load(Path path, Map<String, String> environment) throws IOException {
@@ -48,10 +51,24 @@ public final class AppConfig {
         }
         int httpPort = parsePort(environment.getOrDefault("HTTP_PORT", file.getProperty("http.port", "8080")),
                 "http.port (HTTP_PORT)");
-        int cleanupIntervalSeconds = parseCleanupInterval(environment.getOrDefault("CLEANUP_INTERVAL_SECONDS",
-                file.getProperty("cleanup.interval.seconds", "30")));
+        int cleanupIntervalSeconds = parsePositiveInt(environment.getOrDefault("CLEANUP_INTERVAL_SECONDS",
+                file.getProperty("cleanup.interval.seconds", "30")), "cleanup.interval.seconds (CLEANUP_INTERVAL_SECONDS)");
+        String logDirectory = environment.getOrDefault("LOG_DIRECTORY", file.getProperty("log.directory", "logs"));
+        if (logDirectory.isBlank()) {
+            throw new IllegalArgumentException("log.directory (LOG_DIRECTORY): укажите каталог журнала.");
+        }
+        int logLimitBytes = parsePositiveInt(environment.getOrDefault("LOG_FILE_LIMIT_BYTES",
+                file.getProperty("log.file.limit.bytes", "1048576")), "log.file.limit.bytes (LOG_FILE_LIMIT_BYTES)");
+        int logFileCount = parsePositiveInt(environment.getOrDefault("LOG_FILE_COUNT",
+                file.getProperty("log.file.count", "3")), "log.file.count (LOG_FILE_COUNT)");
+        Level logFileLevel = switch (environment.getOrDefault("LOG_FILE_LEVEL", file.getProperty("log.file.level", "INFO"))) {
+            case "INFO" -> Level.INFO;
+            case "SEVERE" -> Level.SEVERE;
+            default -> throw new IllegalArgumentException("log.file.level (LOG_FILE_LEVEL): укажите INFO или SEVERE.");
+        };
         return new AppConfig("jdbc:postgresql://" + host + ":" + port + "/" + encodedDatabase,
-                user, password, httpHost, httpPort, cleanupIntervalSeconds);
+                user, password, httpHost, httpPort, cleanupIntervalSeconds,
+                new LogSettings(Path.of(logDirectory), logLimitBytes, logFileCount, logFileLevel));
     }
 
     private static String required(Map<String, String> environment, Properties file, String variable, String key) {
@@ -76,18 +93,18 @@ public final class AppConfig {
         return port;
     }
 
-    private static int parseCleanupInterval(String value) {
-        String error = "cleanup.interval.seconds (CLEANUP_INTERVAL_SECONDS): укажите положительное целое число.";
-        int seconds;
+    private static int parsePositiveInt(String value, String setting) {
+        String error = setting + ": укажите положительное целое число.";
+        int number;
         try {
-            seconds = Integer.parseInt(value);
+            number = Integer.parseInt(value);
         } catch (NumberFormatException exception) {
             throw new IllegalArgumentException(error);
         }
-        if (seconds < 1) {
+        if (number < 1) {
             throw new IllegalArgumentException(error);
         }
-        return seconds;
+        return number;
     }
 
     public String getJdbcUrl() {
@@ -112,5 +129,12 @@ public final class AppConfig {
 
     public int getCleanupIntervalSeconds() {
         return cleanupIntervalSeconds;
+    }
+
+    public LogSettings getLogSettings() {
+        return logSettings;
+    }
+
+    public record LogSettings(Path directory, int limitBytes, int fileCount, Level level) {
     }
 }

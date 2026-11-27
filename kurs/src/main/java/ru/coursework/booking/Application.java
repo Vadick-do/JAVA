@@ -3,6 +3,7 @@ package ru.coursework.booking;
 import io.javalin.Javalin;
 import ru.coursework.booking.background.ExpiredHoldCleanup;
 import ru.coursework.booking.core.config.AppConfig;
+import ru.coursework.booking.core.logging.ApplicationLog;
 import ru.coursework.booking.core.repository.postgres.MigrationRunner;
 import ru.coursework.booking.core.repository.postgres.ConnectionFactory;
 import ru.coursework.booking.core.transport.http.HttpServer;
@@ -18,48 +19,73 @@ import ru.coursework.booking.features.slots.transport.http.SlotHandler;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.logging.Logger;
 
 public class Application {
-    private static final Logger LOGGER = Logger.getLogger(Application.class.getName());
-
     public static void main(String[] args) {
         if (args.length != 2 || !args[0].equals("--config")) {
             System.err.println("Использование: --config <путь к application.properties>");
             System.exit(1);
         }
 
+        AppConfig config;
         try {
-            AppConfig config = AppConfig.load(Path.of(args[1]), System.getenv());
-            int appliedMigrations = new MigrationRunner(config).migrate();
-            LOGGER.info("Схема PostgreSQL готова. Применено миграций: " + appliedMigrations + ".");
-            ConnectionFactory connections = new ConnectionFactory(config);
-            PostgresResourceRepository resourceRepository = new PostgresResourceRepository();
-            ResourceService resources = new ResourceService(connections, resourceRepository);
-            PostgresSlotRepository slotRepository = new PostgresSlotRepository();
-            SlotService slots = new SlotService(connections, resourceRepository, slotRepository);
-            BookingService bookings = new BookingService(connections, resourceRepository, slotRepository,
-                    new PostgresBookingRepository());
-            Javalin server = HttpServer.create(new ResourceHandler(resources), new SlotHandler(slots),
-                    new BookingHandler(bookings));
-            ExpiredHoldCleanup cleanup = new ExpiredHoldCleanup();
-            try {
-                server.start(config.getHttpHost(), config.getHttpPort());
-                Runtime.getRuntime().addShutdownHook(new Thread(() -> stop(server, cleanup), "application-shutdown"));
-                cleanup.start(bookings::expirePendingHolds, config.getCleanupIntervalSeconds());
-            } catch (RuntimeException exception) {
-                stop(server, cleanup);
-                throw exception;
-            }
+            config = AppConfig.load(Path.of(args[1]), System.getenv());
         } catch (IOException exception) {
             System.err.println("Не удалось прочитать файл конфигурации: " + args[1]);
             System.exit(1);
+            return;
         } catch (IllegalArgumentException exception) {
             System.err.println("Ошибка конфигурации: " + exception.getMessage());
             System.exit(1);
-        } catch (RuntimeException exception) {
-            LOGGER.severe("Не удалось запустить сервер, тип=" + exception.getClass().getSimpleName());
+            return;
+        }
+
+        ApplicationLog log;
+        try {
+            log = ApplicationLog.open(config.getLogSettings());
+        } catch (IOException | SecurityException exception) {
+            System.err.println("Не удалось открыть файлы журнала, тип=" + exception.getClass().getSimpleName());
             System.exit(1);
+            return;
+        }
+        try {
+            start(config, log);
+        } catch (RuntimeException exception) {
+            try (log) {
+                log.error("Не удалось запустить сервер", exception);
+            }
+            System.exit(1);
+        }
+    }
+
+    private static void start(AppConfig config, ApplicationLog log) {
+        int appliedMigrations = new MigrationRunner(config).migrate();
+        log.event("Схема PostgreSQL готова. Применено миграций: " + appliedMigrations + ".");
+        ConnectionFactory connections = new ConnectionFactory(config);
+        PostgresResourceRepository resourceRepository = new PostgresResourceRepository();
+        ResourceService resources = new ResourceService(connections, resourceRepository);
+        PostgresSlotRepository slotRepository = new PostgresSlotRepository();
+        SlotService slots = new SlotService(connections, resourceRepository, slotRepository);
+        BookingService bookings = new BookingService(connections, resourceRepository, slotRepository,
+                new PostgresBookingRepository());
+        Javalin server = HttpServer.create(new ResourceHandler(resources), new SlotHandler(slots),
+                new BookingHandler(bookings), log);
+        ExpiredHoldCleanup cleanup = new ExpiredHoldCleanup(log);
+        try {
+            server.start(config.getHttpHost(), config.getHttpPort());
+            cleanup.start(bookings::expirePendingHolds, config.getCleanupIntervalSeconds());
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                try (log) {
+                    stop(server, cleanup);
+                }
+            }, "application-shutdown"));
+        } catch (RuntimeException exception) {
+            try {
+                stop(server, cleanup);
+            } catch (RuntimeException stopError) {
+                exception.addSuppressed(stopError);
+            }
+            throw exception;
         }
     }
 

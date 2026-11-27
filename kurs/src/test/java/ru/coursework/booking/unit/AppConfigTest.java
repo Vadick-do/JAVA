@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.logging.Level;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -40,6 +41,7 @@ class AppConfigTest {
         assertEquals("0.0.0.0", config.getHttpHost());
         assertEquals(8080, config.getHttpPort());
         assertEquals(30, config.getCleanupIntervalSeconds());
+        assertEquals(new AppConfig.LogSettings(Path.of("logs"), 1048576, 3, Level.INFO), config.getLogSettings());
     }
 
     @Test
@@ -165,5 +167,33 @@ class AppConfigTest {
                 () -> AppConfig.load(file, Map.of("CLEANUP_INTERVAL_SECONDS", interval)));
 
         assertTrue(exception.getMessage().contains("cleanup.interval.seconds"));
+    }
+
+    @Test
+    void readsLoggingSettingsAndAllowsEnvironmentOverrides() throws IOException {
+        Path file = Files.writeString(directory.resolve("application.properties"), FILE_SETTINGS + """
+                log.directory=runtime/logs
+                log.file.limit.bytes=512
+                log.file.count=4
+                log.file.level=SEVERE
+                """);
+
+        assertEquals(new AppConfig.LogSettings(Path.of("runtime/logs"), 512, 4, Level.SEVERE),
+                AppConfig.load(file, Map.of()).getLogSettings());
+        assertEquals(new AppConfig.LogSettings(directory, 256, 2, Level.INFO), AppConfig.load(file, Map.of(
+                "LOG_DIRECTORY", directory.toString(), "LOG_FILE_LIMIT_BYTES", "256", "LOG_FILE_COUNT", "2",
+                "LOG_FILE_LEVEL", "INFO"
+        )).getLogSettings());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"log.directory= ", "log.file.limit.bytes=0", "log.file.count=abc", "log.file.level=invalid"})
+    void rejectsInvalidLoggingSettings(String setting) throws IOException {
+        Path file = Files.writeString(directory.resolve("application.properties"), FILE_SETTINGS + setting);
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> AppConfig.load(file, Map.of()));
+
+        assertTrue(exception.getMessage().startsWith(setting.split("=")[0]));
     }
 }

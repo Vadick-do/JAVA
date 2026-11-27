@@ -18,9 +18,14 @@ services:
       - HTTP_HOST
       - HTTP_PORT
       - CLEANUP_INTERVAL_SECONDS
+      - LOG_DIRECTORY
+      - LOG_FILE_LIMIT_BYTES
+      - LOG_FILE_COUNT
+      - LOG_FILE_LEVEL
     ports:
       - "127.0.0.1:${HTTP_HOST_PORT:-8080}:${HTTP_CONTAINER_PORT:-8080}"
     volumes:
+      - app-logs:/app/logs
       - type: bind
         source: ${CONFIG_FILE:-./application.properties}
         target: /app/application.properties
@@ -61,3 +66,4 @@ services:
 
 volumes:
   postgres-data:
+  app-logs:
